@@ -8,6 +8,9 @@ src-tauri/target/
 # Vendor (generated from npm packages)
 src/vendor/
 
+# Generated from src/assets/mascot/*.svg by scripts/build-mascot.mjs
+src/mascot-expressions.js
+
 # OS
 .DS_Store
 Thumbs.db

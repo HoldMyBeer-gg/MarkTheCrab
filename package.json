@@ -4,8 +4,9 @@
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
-    "build": "esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting && node scripts/copy-vendor.js",
-    "dev": "esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap",
+    "build:mascot": "node scripts/build-mascot.mjs",
+    "build": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting && node scripts/copy-vendor.js",
+    "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap",
     "tauri": "tauri"
   },
   "devDependencies": {
