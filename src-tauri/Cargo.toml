@@ -17,7 +17,7 @@ regex-lite = "0.1"
 dirs = "6"
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = [] }
 
 [features]
 default = ["custom-protocol"]

@@ -1,6 +1,7 @@
 use crate::markdown;
 use crate::settings::Settings;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::State;
 
@@ -114,6 +115,55 @@ pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &
 </html>"#,
         )
     }
+}
+
+/// Save image bytes to an `images/` directory next to the current markdown file.
+/// Returns the relative path suitable for embedding in markdown.
+#[tauri::command]
+pub fn save_image(
+    state: State<AppState>,
+    image_data: Vec<u8>,
+    filename: String,
+) -> Result<String, String> {
+    let current = state.current_file.lock().unwrap();
+    let base_dir = match current.as_deref() {
+        Some(path) => Path::new(path)
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| PathBuf::from(".")),
+        None => dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")),
+    };
+
+    let images_dir = base_dir.join("images");
+    fs::create_dir_all(&images_dir).map_err(|e| e.to_string())?;
+
+    // Avoid overwriting: append a number if file exists
+    let mut dest = images_dir.join(&filename);
+    if dest.exists() {
+        let stem = Path::new(&filename)
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let ext = Path::new(&filename)
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy()))
+            .unwrap_or_default();
+        let mut n = 1u32;
+        loop {
+            dest = images_dir.join(format!("{stem}_{n}{ext}"));
+            if !dest.exists() {
+                break;
+            }
+            n += 1;
+        }
+    }
+
+    fs::write(&dest, &image_data).map_err(|e| e.to_string())?;
+
+    // Return relative path from the markdown file's directory
+    let relative = format!("images/{}", dest.file_name().unwrap().to_string_lossy());
+    Ok(relative)
 }
 
 fn get_theme_css(theme: &str) -> &'static str {
