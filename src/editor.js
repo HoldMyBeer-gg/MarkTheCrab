@@ -5,14 +5,26 @@ import { languages } from "@codemirror/language-data";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
+
+// Override: the stock defaultHighlightStyle underlines anything tagged as a
+// heading, and lezer-markdown also tags table-header cells as headings —
+// both look ugly in a source editor. Keep bold, drop the underline.
+const mtcHighlightOverrides = HighlightStyle.define([
+  { tag: t.heading, fontWeight: "bold", textDecoration: "none" },
+]);
 
 const themeCompartment = new Compartment();
 const lineNumbersCompartment = new Compartment();
 const wordWrapCompartment = new Compartment();
 const fontSizeCompartment = new Compartment();
 const fontFamilyCompartment = new Compartment();
+const spellcheckCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
+
+const spellcheckAttr = (enabled) =>
+  EditorView.contentAttributes.of({ spellcheck: enabled ? "true" : "false" });
 
 const fontSizeTheme = (size) =>
   EditorView.theme({
@@ -45,7 +57,9 @@ export function createEditor(parent, { onChange, onCursorChange }) {
       wordWrapCompartment.of(EditorView.lineWrapping),
       fontSizeCompartment.of(fontSizeTheme(14)),
       fontFamilyCompartment.of(fontFamilyTheme("")),
+      spellcheckCompartment.of(spellcheckAttr(true)),
       themeCompartment.of([
+        syntaxHighlighting(mtcHighlightOverrides),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       ]),
       readOnlyCompartment.of(EditorState.readOnly.of(false)),
@@ -88,8 +102,11 @@ export function setNightMode(view, enabled) {
   view.dispatch({
     effects: themeCompartment.reconfigure(
       enabled
-        ? [oneDark]
-        : [syntaxHighlighting(defaultHighlightStyle, { fallback: true })]
+        ? [syntaxHighlighting(mtcHighlightOverrides), oneDark]
+        : [
+            syntaxHighlighting(mtcHighlightOverrides),
+            syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+          ]
     ),
   });
 }
@@ -119,6 +136,12 @@ export function setFontSize(view, size) {
 export function setFontFamily(view, family) {
   view.dispatch({
     effects: fontFamilyCompartment.reconfigure(fontFamilyTheme(family)),
+  });
+}
+
+export function setSpellcheck(view, enabled) {
+  view.dispatch({
+    effects: spellcheckCompartment.reconfigure(spellcheckAttr(enabled)),
   });
 }
 
