@@ -2,6 +2,11 @@
   <img src="src/assets/mascot/readme-hero.png" alt="MarkTheCrab — snip snip! A markdown editor that renders exactly what you mean." width="760" />
 </p>
 
+<p align="center">
+  <img width="1231" height="832" alt="Screenshot 2026-04-22 235744" src="https://github.com/user-attachments/assets/77d05a5c-a98b-461a-a0b7-3e702f2419dc" />
+</p>
+
+
 A cross-platform markdown editor built on [Tauri](https://v2.tauri.app/) + Rust + [CodeMirror 6](https://codemirror.net/). Meet Mark — he sweats when your mermaid syntax breaks, bounces when you tap him, and celebrates when you save.
 
 ## Features
