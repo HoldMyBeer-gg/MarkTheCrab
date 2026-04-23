@@ -140,9 +140,15 @@
 
   <dialog id="image-dialog" class="remarkable-dialog">
     <h3>Insert Image</h3>
-    <label>URL or path<input type="text" id="image-url" placeholder="https:// or local path"></label>
+    <label>URL or path
+      <div class="input-with-button">
+        <input type="text" id="image-url" placeholder="https:// or local path">
+        <button id="image-browse" type="button">Browse...</button>
+      </div>
+    </label>
     <label>Alt text<input type="text" id="image-alt" placeholder="Description"></label>
     <label>Title<input type="text" id="image-title" placeholder="Title (optional)"></label>
+    <p class="dialog-hint">Tip: You can also drag &amp; drop or paste (Ctrl+V) images directly into the editor.</p>
     <div class="dialog-buttons">
       <button id="image-cancel">Cancel</button>
       <button id="image-insert" class="primary">Insert</button>

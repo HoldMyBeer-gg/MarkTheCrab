@@ -67,6 +67,9 @@ async function init() {
   // Set up drag-drop
   setupDragDrop();
 
+  // Set up clipboard image paste
+  setupClipboardPaste();
+
   // Load tutorial or empty
   updatePreview("");
 }
@@ -411,6 +414,17 @@ function setupDialogs() {
   // Image dialog
   document.getElementById("image-cancel").onclick = () =>
     document.getElementById("image-dialog").close();
+  document.getElementById("image-browse").onclick = async () => {
+    const path = await open({
+      filters: [
+        { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+    if (path) {
+      document.getElementById("image-url").value = path;
+    }
+  };
   document.getElementById("image-insert").onclick = () => {
     const url = document.getElementById("image-url").value;
     const alt = document.getElementById("image-alt").value || "image";
@@ -527,6 +541,19 @@ function doReplace(all) {
   }
 }
 
+// Image helpers
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i;
+
+async function handleImageFile(file) {
+  const buffer = await file.arrayBuffer();
+  const bytes = Array.from(new Uint8Array(buffer));
+  const relativePath = await invoke("save_image", {
+    imageData: bytes,
+    filename: file.name,
+  });
+  insertAtCursor(editor, `![${file.name}](${relativePath})\n`);
+}
+
 // Drag and drop files
 function setupDragDrop() {
   document.addEventListener("dragover", (e) => {
@@ -541,16 +568,54 @@ function setupDragDrop() {
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
 
-    const file = files[0];
-    if (file.name.match(/\.(md|markdown|txt)$/i)) {
-      const text = await file.text();
-      setContent(editor, text);
-      currentFile = null; // Can't get full path from drag-drop
-      statusFile.textContent = file.name;
-      isModified = false;
-      statusModified.classList.add("hidden");
-      updatePreview(text);
+    for (const file of files) {
+      if (file.name.match(/\.(md|markdown|txt)$/i)) {
+        // Markdown file: open it
+        const text = await file.text();
+        setContent(editor, text);
+        currentFile = null;
+        statusFile.textContent = file.name;
+        isModified = false;
+        statusModified.classList.add("hidden");
+        updatePreview(text);
+        return; // Only open one markdown file
+      } else if (file.name.match(IMAGE_EXTENSIONS)) {
+        // Image file: save to images/ and insert reference
+        await handleImageFile(file);
+      }
     }
+  });
+}
+
+// Clipboard paste: detect image data and save it
+function setupClipboardPaste() {
+  document.addEventListener("paste", async (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        // Generate filename from type: paste-20260422-143052.png
+        const now = new Date();
+        const ts = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
+        const ext = item.type.split("/")[1].replace("jpeg", "jpg");
+        const filename = `paste-${ts}.${ext}`;
+
+        const buffer = await blob.arrayBuffer();
+        const bytes = Array.from(new Uint8Array(buffer));
+        const relativePath = await invoke("save_image", {
+          imageData: bytes,
+          filename,
+        });
+        insertAtCursor(editor, `![pasted image](${relativePath})\n`);
+        return; // Handle one image per paste
+      }
+    }
+    // If no image data, let the default paste handle text
   });
 }
 

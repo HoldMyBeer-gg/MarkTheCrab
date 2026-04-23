@@ -30,6 +30,7 @@ fn main() {
             commands::set_current_file,
             commands::get_current_file,
             commands::export_html,
+            commands::save_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Remarkable");
