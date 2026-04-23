@@ -16,6 +16,67 @@ pub fn render_markdown(text: &str) -> String {
 }
 
 #[tauri::command]
+pub fn get_credits() -> String {
+    // Third-party notices — bundled at compile time so there is nothing to
+    // fetch or miss when shipped through the App Store or Play Store.
+    let sections: &[(&str, &str)] = &[
+        (
+            "MarkTheCrab",
+            include_str!("../../LICENSE"),
+        ),
+        (
+            "Preview themes — derived from Remarkable by Jamie McGowan",
+            include_str!("../third-party-licenses/Remarkable-MIT.txt"),
+        ),
+        (
+            "OpenDyslexic font — Abbie Gonzalez (SIL Open Font License 1.1)",
+            include_str!("../third-party-licenses/OpenDyslexic-OFL.txt"),
+        ),
+        (
+            "CodeMirror — MIT",
+            include_str!("../third-party-licenses/CodeMirror-MIT.txt"),
+        ),
+        (
+            "highlight.js — BSD-3-Clause",
+            include_str!("../third-party-licenses/highlight.js-BSD3.txt"),
+        ),
+        (
+            "pulldown-cmark — MIT",
+            include_str!("../third-party-licenses/pulldown-cmark.txt"),
+        ),
+        (
+            "ammonia — MIT (dual-licensed with Apache-2.0)",
+            include_str!("../third-party-licenses/ammonia-MIT.txt"),
+        ),
+        (
+            "regex-lite — MIT (dual-licensed with Apache-2.0)",
+            include_str!("../third-party-licenses/regex-lite-MIT.txt"),
+        ),
+        (
+            "Tauri — MIT (dual-licensed with Apache-2.0)",
+            include_str!("../third-party-licenses/Tauri-MIT.txt"),
+        ),
+    ];
+
+    let mut out = String::new();
+    out.push_str("MarkTheCrab\n");
+    out.push_str(&format!("Version {}\n\n", env!("CARGO_PKG_VERSION")));
+    out.push_str("This software bundles work from the projects listed below. ");
+    out.push_str("Each section reproduces the upstream license verbatim.\n\n");
+    for (title, body) in sections {
+        out.push_str(&"=".repeat(72));
+        out.push('\n');
+        out.push_str(title);
+        out.push_str("\n");
+        out.push_str(&"=".repeat(72));
+        out.push_str("\n\n");
+        out.push_str(body.trim_end());
+        out.push_str("\n\n");
+    }
+    out
+}
+
+#[tauri::command]
 pub fn load_settings(state: State<AppState>) -> Settings {
     let settings = state.settings.lock().unwrap();
     settings.clone()
@@ -81,20 +142,24 @@ pub fn get_current_file(state: State<AppState>) -> Option<String> {
 pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &str) -> String {
     let body = markdown::render_markdown(markdown_text);
     if styled {
+        // Rewrite the Remarkable-derived preview selector to our neutral one so
+        // the exported HTML doesn't leak upstream branding while still matching
+        // the body class below.
+        let css = get_theme_css(theme).replace(".remarkable-preview", ".markdown-preview");
         format!(
             r#"<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Remarkable Export</title>
+<title>MarkTheCrab Export</title>
 <style>{css}</style>
 {extra_css}
 </head>
-<body class="remarkable-preview">
+<body class="markdown-preview">
 {body}
 </body>
 </html>"#,
-            css = get_theme_css(theme),
+            css = css,
             extra_css = if custom_css.is_empty() {
                 String::new()
             } else {
@@ -107,7 +172,7 @@ pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &
 <html>
 <head>
 <meta charset="utf-8">
-<title>Remarkable Export</title>
+<title>MarkTheCrab Export</title>
 </head>
 <body>
 {body}

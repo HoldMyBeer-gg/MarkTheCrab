@@ -1,10 +1,10 @@
 [package]
-name = "remarkable"
+name = "markthecrab"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"

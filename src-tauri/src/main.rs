@@ -31,7 +31,8 @@ fn main() {
             commands::get_current_file,
             commands::export_html,
             commands::save_image,
+            commands::get_credits,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Remarkable");
+        .expect("error while running MarkTheCrab");
 }

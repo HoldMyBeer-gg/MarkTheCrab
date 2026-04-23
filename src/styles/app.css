@@ -1,4 +1,4 @@
-/* Remarkable - Main Application Styles */
+/* MarkTheCrab - Main Application Styles */
 
 :root {
   --bg-primary: #ffffff;
@@ -130,7 +130,7 @@ html, body {
   border-top: 1px solid var(--border-color);
 }
 
-.remarkable-preview {
+.markdown-preview {
   padding: 20px 30px;
   max-width: 900px;
   margin: 0 auto;
@@ -237,7 +237,7 @@ html, body {
 }
 
 /* Dialogs */
-.remarkable-dialog {
+.app-dialog {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 24px;
@@ -247,23 +247,23 @@ html, body {
   min-width: 360px;
 }
 
-.remarkable-dialog::backdrop {
+.app-dialog::backdrop {
   background: rgba(0, 0, 0, 0.4);
 }
 
-.remarkable-dialog h3 {
+.app-dialog h3 {
   margin-bottom: 16px;
   font-size: 16px;
 }
 
-.remarkable-dialog label {
+.app-dialog label {
   display: block;
   margin-bottom: 12px;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.remarkable-dialog input {
+.app-dialog input {
   display: block;
   width: 100%;
   margin-top: 4px;
@@ -275,7 +275,7 @@ html, body {
   font-size: 14px;
 }
 
-.remarkable-dialog input:focus {
+.app-dialog input:focus {
   outline: none;
   border-color: var(--accent-color);
 }
@@ -285,6 +285,26 @@ html, body {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+}
+
+.about-dialog {
+  width: min(720px, 90vw);
+  max-width: 90vw;
+}
+
+#about-credits {
+  width: 100%;
+  height: min(60vh, 480px);
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
 }
 
 .dialog-buttons button {
@@ -344,4 +364,68 @@ html, body {
 /* Utility */
 .hidden {
   display: none !important;
+}
+
+/* OpenDyslexic (OFL-1.1, https://opendyslexic.org) */
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../fonts/opendyslexic/OpenDyslexic-Regular.otf") format("opentype");
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: italic;
+  font-weight: 400;
+  src: url("../fonts/opendyslexic/OpenDyslexic-Italic.otf") format("opentype");
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: normal;
+  font-weight: 700;
+  src: url("../fonts/opendyslexic/OpenDyslexic-Bold.otf") format("opentype");
+}
+@font-face {
+  font-family: "OpenDyslexic";
+  font-style: italic;
+  font-weight: 700;
+  src: url("../fonts/opendyslexic/OpenDyslexic-BoldItalic.otf") format("opentype");
+}
+
+body.font-opendyslexic,
+body.font-opendyslexic #preview,
+body.font-opendyslexic .cm-content,
+body.font-opendyslexic .cm-gutters {
+  font-family: "OpenDyslexic", Georgia, serif !important;
+}
+
+/* Print: show only the preview, styled by the active theme. */
+@media print {
+  #toolbar,
+  #statusbar,
+  #findbar,
+  #editor-pane,
+  #resizer {
+    display: none !important;
+  }
+  .main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #preview-pane,
+  #preview {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
 }

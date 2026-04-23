@@ -1,10 +1,10 @@
-import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount } from "./editor.js";
-import hljs from "highlight.js";
+import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount } from "./editor.js";
+import hljs from "./hljs-setup.js";
 
 // Make hljs available globally for preview highlighting
 window.hljs = hljs;
 
-const { invoke } = window.__TAURI__.core;
+const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { open, save, message } = window.__TAURI__.dialog;
 
 // State
@@ -32,7 +32,7 @@ const statusCursor = document.getElementById("status-cursor");
 const statusWords = document.getElementById("status-words");
 const statusChars = document.getElementById("status-chars");
 
-// Theme CSS cache
+// Theme CSS cache (scoped source text per theme name)
 const themeCache = {};
 let currentThemeLink = null;
 
@@ -98,22 +98,118 @@ function applySettings() {
   themeSelect.value = settings.theme;
   applyTheme(settings.theme);
 
+  applyFontFamily(settings.font_family);
+  const fontSelect = document.getElementById("font-select");
+  if (fontSelect) fontSelect.value = fontFamilyKey(settings.font_family);
+
   if (settings.rtl) {
     previewEl.style.direction = "rtl";
   }
 }
 
+// Known font-family presets. "default" falls back to the app stylesheet's
+// system font; "opendyslexic" enables the embedded OpenDyslexic face.
+const FONT_FAMILIES = {
+  default: "",
+  opendyslexic: "'OpenDyslexic', Georgia, serif",
+};
+
+function fontFamilyKey(stored) {
+  if (!stored) return "default";
+  const normalized = stored.toLowerCase();
+  if (normalized.includes("opendyslexic")) return "opendyslexic";
+  return "default";
+}
+
+function applyFontFamily(stored) {
+  const key = fontFamilyKey(stored);
+  document.body.classList.toggle("font-opendyslexic", key === "opendyslexic");
+  if (editor) setFontFamily(editor, FONT_FAMILIES[key] || "");
+}
+
 async function applyTheme(themeName) {
-  // Load theme CSS for preview
   if (currentThemeLink) {
     currentThemeLink.remove();
+    currentThemeLink = null;
   }
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = `themes/${themeName}.css`;
-  link.id = "theme-css";
-  document.head.appendChild(link);
-  currentThemeLink = link;
+  let scoped = themeCache[themeName];
+  if (scoped == null) {
+    const res = await fetch(`themes/${themeName}.css`);
+    scoped = scopeThemeCss(await res.text(), "#preview");
+    themeCache[themeName] = scoped;
+  }
+  const style = document.createElement("style");
+  style.id = "theme-css";
+  style.textContent = scoped;
+  document.head.appendChild(style);
+  currentThemeLink = style;
+}
+
+// Prefix every selector in the theme stylesheet with `scope` so theme rules
+// only hit the preview pane. Root-ish selectors (body/html/:root/
+// .remarkable-preview) map to the scope element itself; everything else
+// becomes a descendant. @media print blocks are preserved verbatim so their
+// rules apply to the actual printed page (where the preview is the only
+// visible content — see the print rules in styles/app.css).
+function scopeThemeCss(css, scope) {
+  css = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  // Pull @media print blocks out before scoping so their inner rules keep
+  // targeting `body`, `html`, etc. for the print output.
+  const protected_ = [];
+  css = extractBalancedAtBlocks(css, /@media\s+print\b/gi, protected_);
+  css = css.replace(/([^{}@]+)\{([^{}]*)\}/g, (match, selectors, body) => {
+    const scoped = selectors
+      .split(",")
+      .map((s) => scopeSelector(s, scope))
+      .filter(Boolean)
+      .join(", ");
+    return scoped ? `${scoped} { ${body} }` : match;
+  });
+  for (const [placeholder, block] of protected_) {
+    css = css.replace(placeholder, block);
+  }
+  return css;
+}
+
+// Replace top-level at-rule blocks matching `startRegex` with placeholder
+// tokens and record the originals in `out` as [placeholder, block] pairs.
+// Handles nested braces.
+function extractBalancedAtBlocks(css, startRegex, out) {
+  let result = "";
+  let idx = 0;
+  let m;
+  startRegex.lastIndex = 0;
+  while ((m = startRegex.exec(css)) !== null) {
+    const start = m.index;
+    let i = start + m[0].length;
+    while (i < css.length && css[i] !== "{") i++;
+    if (i >= css.length) break;
+    let depth = 1;
+    let j = i + 1;
+    while (j < css.length && depth > 0) {
+      if (css[j] === "{") depth++;
+      else if (css[j] === "}") depth--;
+      j++;
+    }
+    const block = css.slice(start, j);
+    const placeholder = `___MTC_PH_${out.length}___`;
+    out.push([placeholder, block]);
+    result += css.slice(idx, start) + placeholder;
+    idx = j;
+    startRegex.lastIndex = j;
+  }
+  result += css.slice(idx);
+  return result;
+}
+
+function scopeSelector(raw, scope) {
+  const s = raw.trim();
+  if (!s) return "";
+  if (s === "body" || s === "html" || s === ":root" || s === ".remarkable-preview") return scope;
+  if (s === "*") return `${scope} *`;
+  const rootMatch = s.match(/^(html\s+body|html|body|\.remarkable-preview)(?=[\s>+~:.#\[])/);
+  if (rootMatch) return scope + s.slice(rootMatch[0].length);
+  return `${scope} ${s}`;
 }
 
 function onContentChange(content) {
@@ -139,12 +235,53 @@ async function updatePreview(content) {
   const html = await invoke("render_markdown", { text: content });
   previewEl.innerHTML = html;
 
+  resolvePreviewImageSrcs();
+
   // Highlight code blocks
   previewEl.querySelectorAll("pre code").forEach((block) => {
     if (window.hljs) {
       window.hljs.highlightElement(block);
     }
   });
+}
+
+// Rewrite <img src="..."> in the preview so local paths (relative to the
+// current markdown file, or absolute filesystem paths) load through Tauri's
+// asset protocol. Remote URLs and data/blob URLs pass through untouched.
+function resolvePreviewImageSrcs() {
+  const baseDir = currentFile ? parentDir(currentFile) : null;
+  previewEl.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (!src) return;
+    if (/^(https?:|data:|blob:|asset:|tauri:|https?:\/\/asset\.localhost)/i.test(src)) return;
+    let abs;
+    if (src.startsWith("/") || /^[A-Za-z]:[\\/]/.test(src)) {
+      abs = src;
+    } else if (baseDir) {
+      abs = joinPath(baseDir, src);
+    } else {
+      return;
+    }
+    try {
+      img.src = convertFileSrc(abs);
+    } catch (_) {
+      /* leave original src */
+    }
+  });
+}
+
+function parentDir(p) {
+  const sep = p.includes("\\") && !p.includes("/") ? "\\" : "/";
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i >= 0 ? p.slice(0, i) : "";
+}
+
+function joinPath(dir, rel) {
+  const useBackslash = dir.includes("\\") && !dir.includes("/");
+  const sep = useBackslash ? "\\" : "/";
+  const trimmed = dir.replace(/[\\/]+$/, "");
+  const cleanedRel = rel.replace(/^[\\/]+/, "");
+  return `${trimmed}${sep}${cleanedRel}`;
 }
 
 // File operations
@@ -284,6 +421,7 @@ function setupToolbar() {
     blockquote: () => insertAtLineStart(editor, "> "),
     "toggle-preview": () => togglePreview(),
     "toggle-layout": toggleLayout,
+    about: showAbout,
   };
 
   toolbarEl.addEventListener("click", (e) => {
@@ -299,6 +437,17 @@ function setupToolbar() {
     invoke("update_setting", { key: "theme", value: settings.theme });
     updatePreview(getContent(editor));
   });
+
+  const fontSelect = document.getElementById("font-select");
+  if (fontSelect) {
+    fontSelect.addEventListener("change", (e) => {
+      const key = e.target.value;
+      const stored = key === "opendyslexic" ? "OpenDyslexic" : "";
+      settings.font_family = stored;
+      applyFontFamily(stored);
+      invoke("update_setting", { key: "font_family", value: stored });
+    });
+  }
 }
 
 // Keyboard shortcuts
@@ -458,6 +607,26 @@ function setupDialogs() {
     insertAtCursor(editor, md);
     document.getElementById("table-dialog").close();
   };
+
+  // About dialog
+  document.getElementById("about-close").onclick = () =>
+    document.getElementById("about-dialog").close();
+}
+
+let creditsCache = null;
+async function showAbout() {
+  const dialog = document.getElementById("about-dialog");
+  const textarea = document.getElementById("about-credits");
+  if (creditsCache == null) {
+    try {
+      creditsCache = await invoke("get_credits");
+    } catch (err) {
+      creditsCache = `Failed to load credits: ${err}`;
+    }
+  }
+  textarea.value = creditsCache;
+  dialog.showModal();
+  textarea.scrollTop = 0;
 }
 
 // Find bar

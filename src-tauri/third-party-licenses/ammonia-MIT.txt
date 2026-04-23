@@ -1,7 +1,4 @@
-The MIT License (MIT)
-
-Copyright (c) 2024 Jamie McGowan (original Remarkable themes — src/themes/)
-Copyright (c) 2026 jabberwock (MarkTheCrab app and all other original work)
+Copyright (c) 2015-2022 The ammonia Developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

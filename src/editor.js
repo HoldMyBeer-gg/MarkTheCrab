@@ -11,12 +11,19 @@ const themeCompartment = new Compartment();
 const lineNumbersCompartment = new Compartment();
 const wordWrapCompartment = new Compartment();
 const fontSizeCompartment = new Compartment();
+const fontFamilyCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 
 const fontSizeTheme = (size) =>
   EditorView.theme({
     ".cm-content": { fontSize: `${size}px` },
     ".cm-gutters": { fontSize: `${size}px` },
+  });
+
+const fontFamilyTheme = (family) =>
+  EditorView.theme({
+    ".cm-content": { fontFamily: family || "" },
+    ".cm-gutters": { fontFamily: family || "" },
   });
 
 export function createEditor(parent, { onChange, onCursorChange }) {
@@ -37,6 +44,7 @@ export function createEditor(parent, { onChange, onCursorChange }) {
       highlightSelectionMatches(),
       wordWrapCompartment.of(EditorView.lineWrapping),
       fontSizeCompartment.of(fontSizeTheme(14)),
+      fontFamilyCompartment.of(fontFamilyTheme("")),
       themeCompartment.of([
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       ]),
@@ -105,6 +113,12 @@ export function setWordWrap(view, enabled) {
 export function setFontSize(view, size) {
   view.dispatch({
     effects: fontSizeCompartment.reconfigure(fontSizeTheme(size)),
+  });
+}
+
+export function setFontFamily(view, family) {
+  view.dispatch({
+    effects: fontFamilyCompartment.reconfigure(fontFamilyTheme(family)),
   });
 }
 
