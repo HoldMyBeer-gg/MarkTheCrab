@@ -261,18 +261,52 @@ async function updatePreview(content) {
 
   resolvePreviewImageSrcs();
 
-  // Highlight code blocks (skip mermaid — that runs through its own render
-  // pass below and shouldn't be pre-styled)
+  // Highlight code blocks (skip mermaid/katex/math — those are replaced by
+  // their own render passes and shouldn't be syntax-coloured first)
   previewEl.querySelectorAll("pre code").forEach((block) => {
     if (!window.hljs) return;
-    if (block.classList.contains("language-mermaid") || block.classList.contains("lang-mermaid")) {
+    if (
+      block.classList.contains("language-mermaid") ||
+      block.classList.contains("lang-mermaid") ||
+      block.classList.contains("language-katex") ||
+      block.classList.contains("lang-katex") ||
+      block.classList.contains("language-math") ||
+      block.classList.contains("lang-math")
+    ) {
       return;
     }
     window.hljs.highlightElement(block);
   });
 
+  renderFencedKatex();
   renderMathInPreview();
   renderMermaidInPreview();
+}
+
+// Render fenced ```katex / ```math code blocks as display-mode KaTeX.
+async function renderFencedKatex() {
+  const blocks = previewEl.querySelectorAll(
+    "pre code.language-katex, pre code.lang-katex, pre code.language-math, pre code.lang-math"
+  );
+  if (blocks.length === 0) return;
+  try {
+    const { default: katex } = await import("katex");
+    for (const block of blocks) {
+      const pre = block.parentElement;
+      const source = block.textContent;
+      const container = document.createElement("div");
+      container.className = "katex-block";
+      try {
+        katex.render(source, container, { displayMode: true, throwOnError: false });
+      } catch (err) {
+        container.classList.add("katex-error");
+        container.textContent = String(err && err.message ? err.message : err);
+      }
+      pre.replaceWith(container);
+    }
+  } catch (err) {
+    console.warn("KaTeX failed to load:", err);
+  }
 }
 
 // Mermaid diagrams from ```mermaid fenced blocks. Lazily loaded because
