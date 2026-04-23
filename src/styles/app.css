@@ -1,0 +1,313 @@
+/* Remarkable - Main Application Styles */
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border-color: #ddd;
+  --accent-color: #4183c4;
+  --accent-hover: #3070a8;
+  --toolbar-bg: #f8f8f8;
+  --statusbar-bg: #f0f0f0;
+  --dialog-bg: #ffffff;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.night-mode {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #333333;
+  --text-primary: #d4d4d4;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --border-color: #404040;
+  --accent-color: #569cd6;
+  --accent-hover: #4a8cc2;
+  --toolbar-bg: #2d2d2d;
+  --statusbar-bg: #007acc;
+  --dialog-bg: #2d2d2d;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+/* Layout */
+.main {
+  display: flex;
+  height: calc(100vh - 40px - 28px); /* minus toolbar and statusbar */
+  overflow: hidden;
+}
+
+.main.horizontal {
+  flex-direction: row;
+}
+
+.main.vertical {
+  flex-direction: column;
+}
+
+.pane {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+#editor {
+  flex: 1;
+  overflow: auto;
+}
+
+/* CodeMirror overrides */
+.cm-editor {
+  height: 100%;
+  font-size: 14px;
+}
+
+.cm-editor .cm-scroller {
+  overflow: auto;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, monospace;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Resizer */
+.resizer {
+  flex-shrink: 0;
+  background: var(--border-color);
+  cursor: col-resize;
+  transition: background 0.15s;
+  z-index: 10;
+}
+
+.main.horizontal .resizer {
+  width: 4px;
+  cursor: col-resize;
+}
+
+.main.vertical .resizer {
+  height: 4px;
+  cursor: row-resize;
+}
+
+.resizer:hover, .resizer.active {
+  background: var(--accent-color);
+}
+
+/* Preview */
+.preview-pane {
+  overflow: auto;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+}
+
+.main.vertical .preview-pane {
+  border-left: none;
+  border-top: 1px solid var(--border-color);
+}
+
+.remarkable-preview {
+  padding: 20px 30px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Find bar */
+.findbar {
+  position: fixed;
+  top: 40px;
+  right: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.findbar.hidden {
+  display: none;
+}
+
+.findbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.findbar input[type="text"] {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  width: 200px;
+  outline: none;
+}
+
+.findbar input[type="text"]:focus {
+  border-color: var(--accent-color);
+}
+
+.findbar label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.find-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 60px;
+}
+
+.findbar button {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.findbar button:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
+/* Status bar */
+.statusbar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--statusbar-bg);
+  border-top: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
+  gap: 16px;
+  user-select: none;
+}
+
+.night-mode .statusbar {
+  color: #fff;
+}
+
+.statusbar-spacer {
+  flex: 1;
+}
+
+#status-modified {
+  color: var(--accent-color);
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Dialogs */
+.remarkable-dialog {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--dialog-bg);
+  color: var(--text-primary);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  min-width: 360px;
+}
+
+.remarkable-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.remarkable-dialog h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+.remarkable-dialog label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.remarkable-dialog input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.remarkable-dialog input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.dialog-buttons button {
+  padding: 6px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.dialog-buttons button.primary {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.dialog-buttons button.primary:hover {
+  background: var(--accent-hover);
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}

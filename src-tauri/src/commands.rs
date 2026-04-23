@@ -1,0 +1,132 @@
+use crate::markdown;
+use crate::settings::Settings;
+use std::fs;
+use std::sync::Mutex;
+use tauri::State;
+
+pub struct AppState {
+    pub settings: Mutex<Settings>,
+    pub current_file: Mutex<Option<String>>,
+}
+
+#[tauri::command]
+pub fn render_markdown(text: &str) -> String {
+    markdown::render_markdown(text)
+}
+
+#[tauri::command]
+pub fn load_settings(state: State<AppState>) -> Settings {
+    let settings = state.settings.lock().unwrap();
+    settings.clone()
+}
+
+#[tauri::command]
+pub fn save_settings(state: State<AppState>, settings: Settings) -> Result<(), String> {
+    let mut current = state.settings.lock().unwrap();
+    *current = settings;
+    current.save()
+}
+
+#[tauri::command]
+pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<(), String> {
+    let mut settings = state.settings.lock().unwrap();
+    match key {
+        "theme" => settings.theme = value.to_string(),
+        "custom_css" => settings.custom_css = value.to_string(),
+        "font_family" => settings.font_family = value.to_string(),
+        "font_size" => settings.font_size = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?,
+        "line_numbers" => settings.line_numbers = value == "true",
+        "word_wrap" => settings.word_wrap = value == "true",
+        "live_preview" => settings.live_preview = value == "true",
+        "night_mode" => settings.night_mode = value == "true",
+        "show_toolbar" => settings.show_toolbar = value == "true",
+        "show_statusbar" => settings.show_statusbar = value == "true",
+        "vertical_layout" => settings.vertical_layout = value == "true",
+        "zoom_level" => settings.zoom_level = value.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?,
+        "rtl" => settings.rtl = value == "true",
+        "spellcheck" => settings.spellcheck = value == "true",
+        _ => return Err(format!("Unknown setting: {key}")),
+    }
+    settings.save()
+}
+
+#[tauri::command]
+pub fn read_file(path: &str) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn write_file(path: &str, content: &str) -> Result<(), String> {
+    fs::write(path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_current_file(state: State<AppState>, path: Option<String>) {
+    let mut current = state.current_file.lock().unwrap();
+    *current = path.clone();
+    if let Some(ref p) = path {
+        let mut settings = state.settings.lock().unwrap();
+        settings.add_recent_file(p);
+        settings.save().ok();
+    }
+}
+
+#[tauri::command]
+pub fn get_current_file(state: State<AppState>) -> Option<String> {
+    state.current_file.lock().unwrap().clone()
+}
+
+#[tauri::command]
+pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &str) -> String {
+    let body = markdown::render_markdown(markdown_text);
+    if styled {
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Remarkable Export</title>
+<style>{css}</style>
+{extra_css}
+</head>
+<body class="remarkable-preview">
+{body}
+</body>
+</html>"#,
+            css = get_theme_css(theme),
+            extra_css = if custom_css.is_empty() {
+                String::new()
+            } else {
+                format!("<style>{custom_css}</style>")
+            },
+        )
+    } else {
+        format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Remarkable Export</title>
+</head>
+<body>
+{body}
+</body>
+</html>"#,
+        )
+    }
+}
+
+fn get_theme_css(theme: &str) -> &'static str {
+    match theme {
+        "dark" => include_str!("../../src/themes/dark.css"),
+        "foghorn" => include_str!("../../src/themes/foghorn.css"),
+        "github" => include_str!("../../src/themes/github.css"),
+        "handwriting" => include_str!("../../src/themes/handwriting.css"),
+        "metro-vibes" => include_str!("../../src/themes/metro-vibes.css"),
+        "metro-vibes-dark" => include_str!("../../src/themes/metro-vibes-dark.css"),
+        "modern" => include_str!("../../src/themes/modern.css"),
+        "solarized-dark" => include_str!("../../src/themes/solarized-dark.css"),
+        "solarized-light" => include_str!("../../src/themes/solarized-light.css"),
+        _ => include_str!("../../src/themes/github.css"),
+    }
+}
