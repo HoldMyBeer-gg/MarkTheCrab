@@ -142,7 +142,7 @@ fn pandoc_delims_to_dollars(input: &str) -> String {
     let display = regex_lite::Regex::new(r"\\\[([\s\S]+?)\\\]").unwrap();
     let inline = regex_lite::Regex::new(r"\\\(([^\n]+?)\\\)").unwrap();
     let s = display
-        .replace_all(input, |caps: &regex_lite::Captures| format!("$$${}$$", &caps[1]))
+        .replace_all(input, |caps: &regex_lite::Captures| format!("$${}$$", &caps[1]))
         .into_owned();
     inline
         .replace_all(&s, |caps: &regex_lite::Captures| format!("${}$", &caps[1]))
@@ -865,12 +865,16 @@ mod tests {
             "expected dollars, got: {}",
             result
         );
+        // Guard against extra leading $ sneaking in (a bug I shipped once).
+        assert!(!result.contains("$$a^2"), "inline got triple-dollared: {}", result);
+
         let result = render_markdown("\\[\\nabla \\cdot \\vec{E}\\]");
         assert!(
             result.contains("$$\\nabla \\cdot \\vec{E}$$"),
             "expected double dollars, got: {}",
             result
         );
+        assert!(!result.contains("$$$"), "display got triple-dollared: {}", result);
     }
 
     #[test]
@@ -893,5 +897,17 @@ mod tests {
     fn test_highlight_still_works_in_prose() {
         let result = render_markdown("This is ==important== text.");
         assert!(result.contains("<mark>important</mark>"));
+    }
+
+    #[test]
+    fn test_showcase_pandoc_line_produces_clean_dollars() {
+        let md = "Pandoc delimiters work too: \\(a^2 + b^2 = c^2\\) for inline and\n\\[\\nabla \\cdot \\vec{E} = \\frac{\\rho}{\\epsilon_0}\\] for display.";
+        let result = render_markdown(md);
+        assert!(
+            result.contains("$$\\nabla \\cdot \\vec{E} = \\frac{\\rho}{\\epsilon_0}$$"),
+            "display form missing in: {}",
+            result
+        );
+        assert!(!result.contains("$$$"), "extra dollar sneaked in: {}", result);
     }
 }
