@@ -722,15 +722,14 @@ async function saveFileAs() {
 
 async function printPreview() {
   // Ensure the preview is rendered with current content; the print CSS
-  // (see styles/app.css) hides chrome and shows only the preview, so the
-  // system print dialog's "Save as PDF" produces a clean styled PDF.
+  // (see styles/app.css) hides chrome so only the preview prints. On
+  // macOS/iOS, Tauri shims window.print() to route through its webview
+  // plugin — that requires the `core:webview:allow-print` permission
+  // (see capabilities/default.json).
   const wasHidden = !previewVisible;
-  if (wasHidden) {
-    togglePreview(true);
-  }
+  if (wasHidden) togglePreview(true);
   await updatePreview(getContent(editor));
-  // Give the layout a tick to settle before the print snapshot.
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await new Promise((r) => setTimeout(r, 50));
   window.print();
   if (wasHidden) togglePreview(false);
 }
