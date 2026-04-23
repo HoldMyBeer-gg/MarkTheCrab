@@ -359,70 +359,149 @@ async function updatePreview(content) {
   }
 }
 
-// Render fenced ```katex / ```math code blocks as display-mode KaTeX.
+// ────── Lazy fenced-block rendering (KaTeX + Mermaid) ─────────────
+// Docs with thousands of `$$` or ```katex / ```mermaid fences used to
+// block the main thread for seconds while every block rendered up
+// front. Now each fenced block becomes a placeholder and only renders
+// when it scrolls into (or near) the viewport. A source-text cache
+// makes repeated formulas/diagrams nearly free.
+
+const katexCache = new Map(); // source → rendered HTML
+const mermaidCache = new Map();
+const CACHE_MAX = 1000;
+
+function cachePut(map, key, value) {
+  if (map.size >= CACHE_MAX) {
+    map.delete(map.keys().next().value);
+  }
+  map.set(key, value);
+}
+
+function getLazyObserver() {
+  if (!getLazyObserver._o) {
+    getLazyObserver._o = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const target = entry.target;
+          getLazyObserver._o.unobserve(target);
+          if (!document.contains(target)) continue;
+          const render = target.__mtcLazyRender;
+          if (render) render();
+        }
+      },
+      { root: previewPane, rootMargin: "400px 0px" }
+    );
+  }
+  return getLazyObserver._o;
+}
+
+let katexPromise = null;
+function loadKatex() {
+  if (!katexPromise) {
+    katexPromise = import("katex").then((m) => m.default);
+  }
+  return katexPromise;
+}
+
+// Render fenced ```katex / ```math blocks as display-mode KaTeX, lazily.
 async function renderFencedKatex() {
   const blocks = previewEl.querySelectorAll(
     "pre code.language-katex, pre code.lang-katex, pre code.language-math, pre code.lang-math"
   );
   if (blocks.length === 0) return;
-  try {
-    const { default: katex } = await import("katex");
-    for (const block of blocks) {
-      const pre = block.parentElement;
-      const source = block.textContent;
-      const container = document.createElement("div");
-      container.className = "katex-block";
-      try {
-        katex.render(source, container, { displayMode: true, throwOnError: false });
-      } catch (err) {
-        renderMascotErrorCard(container, "KaTeX error", err);
-      }
-      pre.replaceWith(container);
-    }
-  } catch (err) {
-    console.warn("KaTeX failed to load:", err);
-  }
-}
 
-// Mermaid diagrams from ```mermaid fenced blocks. Lazily loaded because
-// the library is ~1 MB; most docs don't use it.
-let mermaidPromise = null;
-let mermaidBlockCounter = 0;
-async function renderMermaidInPreview() {
-  const blocks = previewEl.querySelectorAll("pre code.language-mermaid, pre code.lang-mermaid");
-  if (blocks.length === 0) return;
-  if (!mermaidPromise) {
-    mermaidPromise = import("mermaid").then(({ default: mermaid }) => {
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: settings.night_mode ? "dark" : "default",
-      });
-      return mermaid;
-    });
-  }
-  let mermaid;
-  try {
-    mermaid = await mermaidPromise;
-  } catch (err) {
-    console.warn("Mermaid failed to load:", err);
-    return;
-  }
+  // Swap every fenced block for a placeholder container up front. The
+  // actual katex.render calls happen on viewport entry. This keeps the
+  // first paint fast even when the doc has thousands of math blocks.
+  const observer = getLazyObserver();
+  let katex = null;
   for (const block of blocks) {
     const pre = block.parentElement;
     const source = block.textContent;
-    const id = `mtc-mermaid-${++mermaidBlockCounter}`;
-    try {
-      const { svg } = await mermaid.render(id, source);
-      const container = document.createElement("div");
-      container.className = "mermaid";
-      container.innerHTML = svg;
-      pre.replaceWith(container);
-    } catch (err) {
-      const card = document.createElement("div");
-      renderMascotErrorCard(card, "Mermaid parse error", err);
-      pre.replaceWith(card);
-    }
+    const container = document.createElement("div");
+    container.className = "katex-block katex-pending";
+    container.style.minHeight = "1.6em"; // reserve some space
+    pre.replaceWith(container);
+
+    container.__mtcLazyRender = async () => {
+      container.classList.remove("katex-pending");
+      container.style.minHeight = "";
+      const cached = katexCache.get(source);
+      if (cached != null) {
+        container.innerHTML = cached;
+        return;
+      }
+      try {
+        if (!katex) katex = await loadKatex();
+      } catch (err) {
+        console.warn("KaTeX failed to load:", err);
+        return;
+      }
+      try {
+        katex.render(source, container, { displayMode: true, throwOnError: false });
+        cachePut(katexCache, source, container.innerHTML);
+      } catch (err) {
+        renderMascotErrorCard(container, "KaTeX error", err);
+      }
+    };
+    observer.observe(container);
+  }
+}
+
+// Mermaid diagrams from ```mermaid fenced blocks. Same lazy strategy.
+let mermaidPromise = null;
+let mermaidBlockCounter = 0;
+async function renderMermaidInPreview() {
+  const blocks = previewEl.querySelectorAll(
+    "pre code.language-mermaid, pre code.lang-mermaid"
+  );
+  if (blocks.length === 0) return;
+
+  const observer = getLazyObserver();
+  let mermaid = null;
+  for (const block of blocks) {
+    const pre = block.parentElement;
+    const source = block.textContent;
+    const container = document.createElement("div");
+    container.className = "mermaid mermaid-pending";
+    container.style.minHeight = "40px";
+    pre.replaceWith(container);
+
+    container.__mtcLazyRender = async () => {
+      container.classList.remove("mermaid-pending");
+      container.style.minHeight = "";
+      const cached = mermaidCache.get(source);
+      if (cached != null) {
+        container.innerHTML = cached;
+        return;
+      }
+      if (!mermaidPromise) {
+        mermaidPromise = import("mermaid").then(({ default: m }) => {
+          m.initialize({
+            startOnLoad: false,
+            securityLevel: "strict",
+            theme: settings.night_mode ? "dark" : "default",
+          });
+          return m;
+        });
+      }
+      try {
+        if (!mermaid) mermaid = await mermaidPromise;
+      } catch (err) {
+        console.warn("Mermaid failed to load:", err);
+        return;
+      }
+      const id = `mtc-mermaid-${++mermaidBlockCounter}`;
+      try {
+        const { svg } = await mermaid.render(id, source);
+        container.innerHTML = svg;
+        cachePut(mermaidCache, source, svg);
+      } catch (err) {
+        renderMascotErrorCard(container, "Mermaid parse error", err);
+      }
+    };
+    observer.observe(container);
   }
 }
 
@@ -1176,8 +1255,15 @@ function setupClipboardPaste() {
     const paneRect = previewPane.getBoundingClientRect();
     const scrollY = previewPane.scrollTop;
     const nodes = previewEl.querySelectorAll("a.src-line[data-src-line]");
+    // On huge docs (test.md has ~4000 top-level blocks) taking getBoundingClientRect
+    // for every marker on every scroll event is a bottleneck. Sample uniformly to
+    // keep the marker list bounded — the interpolation between samples is enough
+    // for smooth sync.
+    const MAX_MARKERS = 500;
+    const stride = nodes.length > MAX_MARKERS ? Math.ceil(nodes.length / MAX_MARKERS) : 1;
     const markers = [];
-    for (const el of nodes) {
+    for (let i = 0; i < nodes.length; i += stride) {
+      const el = nodes[i];
       const line = parseInt(el.dataset.srcLine, 10);
       if (Number.isNaN(line)) continue;
       // Use the following element's top if present — the empty <a> often
@@ -1186,6 +1272,16 @@ function setupClipboardPaste() {
       const target = el.nextElementSibling || el;
       const top = target.getBoundingClientRect().top - paneRect.top + scrollY;
       markers.push({ line, top });
+    }
+    // Always include the last marker so we don't lose end-of-doc accuracy.
+    if (stride > 1 && nodes.length > 0) {
+      const el = nodes[nodes.length - 1];
+      const line = parseInt(el.dataset.srcLine, 10);
+      if (!Number.isNaN(line)) {
+        const target = el.nextElementSibling || el;
+        const top = target.getBoundingClientRect().top - paneRect.top + scrollY;
+        markers.push({ line, top });
+      }
     }
     markers.sort((a, b) => a.line - b.line || a.top - b.top);
     markersCache = markers;

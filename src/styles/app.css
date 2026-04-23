@@ -238,6 +238,21 @@ html, body {
   overflow-x: auto;
 }
 
+/* Pending placeholder while a lazy render hasn't fired yet. Blends
+   with the preview background so there's no flash of ugly border. */
+#preview .katex-pending,
+#preview .mermaid-pending {
+  opacity: 0.35;
+  background: linear-gradient(90deg, transparent, var(--bg-secondary) 50%, transparent);
+  background-size: 200% 100%;
+  animation: mtc-shimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+@keyframes mtc-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* Scroll-sync anchors: zero-size invisible markers. */
 #preview a.src-line {
   display: block;
