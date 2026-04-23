@@ -44,12 +44,25 @@ function injectStyles() {
   const style = document.createElement("style");
   style.id = "mascot-styles";
   style.textContent = `
-    .mascot { display: inline-block; line-height: 0; user-select: none; -webkit-user-select: none; }
+    .mascot {
+      display: inline-block; line-height: 0; user-select: none; -webkit-user-select: none;
+      cursor: pointer;
+      /* Re-enable clicks even when mounted in a pointer-events:none overlay */
+      pointer-events: auto;
+    }
     .mascot svg { width: 100%; height: 100%; overflow: visible; }
     .mascot-breathe { animation: mascot-breathe 3.5s ease-in-out infinite; transform-origin: center 80%; }
     @keyframes mascot-breathe {
       0%, 100% { transform: scale(1); }
       50%      { transform: scale(1.025); }
+    }
+    .mascot-bounce { animation: mascot-bounce 900ms cubic-bezier(.3,.7,.4,1); transform-origin: center 80%; }
+    @keyframes mascot-bounce {
+      0%   { transform: scale(1); }
+      18%  { transform: translateY(-5px) scale(1.18); }
+      35%  { transform: translateY(0)    scale(0.92); }
+      55%  { transform: translateY(0)    scale(1.06); }
+      100% { transform: scale(1); }
     }
     .mascot .eye .pupil { transition: transform 200ms ease-out; transform-origin: center; transform-box: fill-box; }
     .mascot.blink .eye .pupil { transform: scaleY(0.08); }
@@ -84,7 +97,33 @@ function buildMascot(expression, size) {
   if (size) { el.style.width = size + "px"; el.style.height = size + "px"; }
   el.innerHTML = EXPRESSIONS[expression] || EXPRESSIONS.happy;
   el.dataset.expression = expression;
+  el.addEventListener("click", handleMascotClick);
   return el;
+}
+
+// Easter-egg: tap/click Mark to briefly celebrate, then revert. Skip on the
+// error face (celebrating his own failure would be tasteless) and on the
+// save-flash one-shot (it's already animating away).
+function handleMascotClick(e) {
+  const el = e.currentTarget;
+  if (el.dataset.expression === "error") return;
+  if (el.classList.contains("mascot-flash")) return;
+  if (el.dataset.celebrating === "true") return;
+
+  const prior = el.dataset.expression;
+  const wasBreathing = el.classList.contains("mascot-breathe");
+  el.dataset.celebrating = "true";
+  if (wasBreathing) el.classList.remove("mascot-breathe");
+  el.innerHTML = EXPRESSIONS.celebrating;
+  el.classList.add("mascot-bounce");
+  setTimeout(() => {
+    // Bail if something else changed the expression while we were bouncing
+    if (el.dataset.celebrating !== "true") return;
+    el.classList.remove("mascot-bounce");
+    el.innerHTML = EXPRESSIONS[prior] || EXPRESSIONS.happy;
+    if (wasBreathing) el.classList.add("mascot-breathe");
+    delete el.dataset.celebrating;
+  }, 900);
 }
 
 // Blink controller — schedules random blinks on all registered mascots.
@@ -138,6 +177,9 @@ export const Mascot = {
     const el = host.querySelector(".mascot");
     if (!el) return this.show(host, expression);
     if (el.dataset.expression === expression) return;
+    // If a celebration is in flight, cancel its pending revert.
+    delete el.dataset.celebrating;
+    el.classList.remove("mascot-bounce");
     el.innerHTML = EXPRESSIONS[expression] || EXPRESSIONS.happy;
     el.dataset.expression = expression;
   },
