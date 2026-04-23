@@ -10,9 +10,29 @@ use std::collections::HashMap;
 /// - [ ] / [x] → checkbox HTML
 /// - [TOC] or [[_TOC_]] → nested list of document headings
 pub fn render_markdown(input: &str) -> String {
-    // Pre-process custom syntax before pulldown-cmark
-    let processed = preprocess_custom_syntax(input);
-    let line_starts = compute_line_starts(&processed);
+    // Mask fenced/inline code so their contents don't get eaten by the
+    // `==highlight==` / `^sup^` / `~sub~` preprocessors.
+    let mut code_sidebar: Vec<String> = Vec::new();
+    let masked_code = mask_code(input, &mut code_sidebar);
+
+    // Convert Pandoc-style math delimiters to the dollar form that
+    // survives CommonMark unescaping. `\(x\)` → `$x$`, `\[x\]` → `$$x$$`.
+    let masked_code = pandoc_delims_to_dollars(&masked_code);
+
+    // Mask math so (a) the custom-syntax preprocessors don't touch its
+    // contents and (b) CommonMark's backslash-escapes don't mangle the
+    // LaTeX (e.g. `\,` → `,`). Math stays masked through pulldown-cmark
+    // and is restored in the final HTML, right before sanitization.
+    let mut math_sidebar: Vec<String> = Vec::new();
+    let masked = mask_math(&masked_code, &mut math_sidebar);
+
+    // Apply custom inline syntax on the now-safe text
+    let processed = apply_custom_inline_syntax(&masked);
+
+    // Restore code so pulldown-cmark parses it as real code blocks/spans
+    let with_code = restore_sentinels(&processed, &code_sidebar, CODE_OPEN, CODE_CLOSE);
+
+    let line_starts = compute_line_starts(&with_code);
 
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -22,7 +42,7 @@ pub fn render_markdown(input: &str) -> String {
     options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
     options.insert(Options::ENABLE_SMART_PUNCTUATION);
 
-    let parser = Parser::new_ext(&processed, options);
+    let parser = Parser::new_ext(&with_code, options);
 
     // Collect events with source byte offsets for scroll-sync anchors
     let events_with_offsets: Vec<(Event, std::ops::Range<usize>)> =
@@ -36,11 +56,185 @@ pub fn render_markdown(input: &str) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, events.into_iter());
 
+    // Restore math delimiters in the generated HTML. The frontend's KaTeX
+    // auto-render pass then finds `$...$` / `$$...$$` and renders it.
+    let html_output = restore_sentinels(&html_output, &math_sidebar, MATH_OPEN, MATH_CLOSE);
+
     // Post-process HTML for custom syntax that can't be done at the event level
     let html_output = postprocess_custom_html(&html_output);
 
     // Sanitize with ammonia — allow safe HTML only
     sanitize_html(&html_output)
+}
+
+// Sentinel characters in the Unicode Private Use Area — chosen so they
+// don't collide with anything a user would reasonably type and so
+// pulldown-cmark, CommonMark escaping, and ammonia all pass them through
+// as plain text.
+const CODE_OPEN: char = '\u{E000}';
+const CODE_CLOSE: char = '\u{E001}';
+const MATH_OPEN: char = '\u{E002}';
+const MATH_CLOSE: char = '\u{E003}';
+
+fn mask_code(input: &str, sidebar: &mut Vec<String>) -> String {
+    // First pass: extract fenced code blocks line-by-line.
+    let mut without_fences = String::with_capacity(input.len());
+    let mut lines = input.lines().peekable();
+    while let Some(line) = lines.next() {
+        let (leading, trimmed) = split_leading_spaces(line);
+        if leading <= 3 {
+            let fence_char = if trimmed.starts_with("```") {
+                Some('`')
+            } else if trimmed.starts_with("~~~") {
+                Some('~')
+            } else {
+                None
+            };
+            if let Some(c) = fence_char {
+                let open_run = trimmed.chars().take_while(|&x| x == c).count();
+                let mut block = String::new();
+                block.push_str(line);
+                block.push('\n');
+                // Consume lines until closing fence or EOF
+                while let Some(&next) = lines.peek() {
+                    block.push_str(next);
+                    block.push('\n');
+                    lines.next();
+                    let (nl_lead, nl_trim) = split_leading_spaces(next);
+                    if nl_lead <= 3 {
+                        let run = nl_trim.chars().take_while(|&x| x == c).count();
+                        if run >= open_run
+                            && nl_trim[run..]
+                                .chars()
+                                .all(|x| x == ' ' || x == '\t')
+                        {
+                            break;
+                        }
+                    }
+                }
+                let idx = sidebar.len();
+                sidebar.push(block);
+                write_sentinel(&mut without_fences, CODE_OPEN, idx, CODE_CLOSE);
+                without_fences.push('\n');
+                continue;
+            }
+        }
+        without_fences.push_str(line);
+        without_fences.push('\n');
+    }
+
+    // Second pass: mask inline code spans `...` (simple single-backtick form).
+    // Multi-backtick spans are rare and we'd rather under-mask than over-mask.
+    let re = regex_lite::Regex::new(r"`[^`\n]+`").unwrap();
+    re.replace_all(&without_fences, |caps: &regex_lite::Captures| {
+        let idx = sidebar.len();
+        sidebar.push(caps[0].to_string());
+        let mut s = String::new();
+        write_sentinel(&mut s, CODE_OPEN, idx, CODE_CLOSE);
+        s
+    })
+    .into_owned()
+}
+
+fn pandoc_delims_to_dollars(input: &str) -> String {
+    // `\[...\]` → `$$...$$`, `\(...\)` → `$...$`. Operating on already
+    // code-masked text so we don't rewrite escape sequences inside code.
+    let display = regex_lite::Regex::new(r"\\\[([\s\S]+?)\\\]").unwrap();
+    let inline = regex_lite::Regex::new(r"\\\(([^\n]+?)\\\)").unwrap();
+    let s = display
+        .replace_all(input, |caps: &regex_lite::Captures| format!("$$${}$$", &caps[1]))
+        .into_owned();
+    inline
+        .replace_all(&s, |caps: &regex_lite::Captures| format!("${}$", &caps[1]))
+        .into_owned()
+}
+
+fn mask_math(input: &str, sidebar: &mut Vec<String>) -> String {
+    // Display math first so `$$...$$` doesn't get consumed by the inline pass.
+    let display = regex_lite::Regex::new(r"\$\$[\s\S]+?\$\$").unwrap();
+    let inline_multi = regex_lite::Regex::new(r"\$[^\s$][^$\n]*?[^\s$]\$").unwrap();
+    let inline_single = regex_lite::Regex::new(r"\$[^\s$]\$").unwrap();
+    let mut out = input.to_string();
+    for re in &[display, inline_multi, inline_single] {
+        out = re
+            .replace_all(&out, |caps: &regex_lite::Captures| {
+                let idx = sidebar.len();
+                sidebar.push(caps[0].to_string());
+                let mut s = String::new();
+                write_sentinel(&mut s, MATH_OPEN, idx, MATH_CLOSE);
+                s
+            })
+            .into_owned();
+    }
+    out
+}
+
+fn write_sentinel(out: &mut String, open: char, idx: usize, close: char) {
+    out.push(open);
+    out.push_str(&idx.to_string());
+    out.push(close);
+}
+
+fn restore_sentinels(input: &str, sidebar: &[String], open: char, close: char) -> String {
+    if sidebar.is_empty() {
+        return input.to_string();
+    }
+    let mut out = String::with_capacity(input.len());
+    let mut iter = input.char_indices().peekable();
+    while let Some((_, c)) = iter.next() {
+        if c == open {
+            let mut num = String::new();
+            while let Some(&(_, p)) = iter.peek() {
+                if p.is_ascii_digit() {
+                    num.push(p);
+                    iter.next();
+                } else {
+                    break;
+                }
+            }
+            if let Some(&(_, p)) = iter.peek() {
+                if p == close {
+                    iter.next();
+                    if let Ok(idx) = num.parse::<usize>() {
+                        if let Some(orig) = sidebar.get(idx) {
+                            out.push_str(orig);
+                            continue;
+                        }
+                    }
+                }
+            }
+            // Malformed sentinel: emit what we swallowed as-is
+            out.push(open);
+            out.push_str(&num);
+            continue;
+        }
+        out.push(c);
+    }
+    out
+}
+
+fn split_leading_spaces(line: &str) -> (usize, &str) {
+    let mut n = 0;
+    for (i, c) in line.char_indices() {
+        if c == ' ' {
+            n += 1;
+        } else {
+            return (n, &line[i..]);
+        }
+    }
+    (n, "")
+}
+
+fn apply_custom_inline_syntax(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    for line in input.lines() {
+        let line = process_highlight(line);
+        let line = process_superscript(&line);
+        let line = process_subscript(&line);
+        result.push_str(&line);
+        result.push('\n');
+    }
+    result
 }
 
 struct HeadingInfo {
@@ -333,20 +527,6 @@ fn html_escape(s: &str) -> String {
         }
     }
     out
-}
-
-fn preprocess_custom_syntax(input: &str) -> String {
-    let mut result = String::with_capacity(input.len());
-
-    for line in input.lines() {
-        let line = process_highlight(line);
-        let line = process_superscript(&line);
-        let line = process_subscript(&line);
-        result.push_str(&line);
-        result.push('\n');
-    }
-
-    result
 }
 
 /// ==text== → <mark>text</mark>
@@ -646,9 +826,72 @@ mod tests {
     fn test_source_line_markers() {
         let md = "# Top\n\nSecond para.\n\n> A quote";
         let result = render_markdown(md);
-        eprintln!("result: {}", result);
         assert!(result.contains("data-src-line=\"0\""));
         assert!(result.contains("data-src-line=\"2\""));
         assert!(result.contains("data-src-line=\"4\""));
+    }
+
+    #[test]
+    fn test_inline_math_survives_preprocessor() {
+        let result = render_markdown("Integral: $e^{-x^2}\\,dx$");
+        assert!(
+            result.contains("$e^{-x^2}\\,dx$"),
+            "math should pass through verbatim, got: {}",
+            result
+        );
+        assert!(
+            !result.contains("<sup>"),
+            "no <sup> inside math span, got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_display_math_survives_preprocessor() {
+        let md = "$$\\int_0^{\\infty} e^{-x^2}\\,dx$$";
+        let result = render_markdown(md);
+        assert!(
+            result.contains("$$\\int_0^{\\infty} e^{-x^2}\\,dx$$"),
+            "got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_pandoc_delimiters_rewritten() {
+        let result = render_markdown("pythag: \\(a^2 + b^2 = c^2\\)");
+        assert!(
+            result.contains("$a^2 + b^2 = c^2$"),
+            "expected dollars, got: {}",
+            result
+        );
+        let result = render_markdown("\\[\\nabla \\cdot \\vec{E}\\]");
+        assert!(
+            result.contains("$$\\nabla \\cdot \\vec{E}$$"),
+            "expected double dollars, got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_superscript_in_katex_fence_not_mangled() {
+        let md = "```katex\n\\overbrace{a+b}^{\\text{note}}\n```";
+        let result = render_markdown(md);
+        assert!(
+            result.contains("\\overbrace{a+b}^{\\text{note}}"),
+            "got: {}",
+            result
+        );
+        assert!(
+            !result.contains("<sup>"),
+            "no <sup> inside a code block, got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_highlight_still_works_in_prose() {
+        let result = render_markdown("This is ==important== text.");
+        assert!(result.contains("<mark>important</mark>"));
     }
 }

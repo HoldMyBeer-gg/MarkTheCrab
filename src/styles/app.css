@@ -222,10 +222,20 @@ html, body {
   max-width: 100%;
   height: auto;
 }
-#preview .mermaid-error {
+#preview .mermaid-error,
+#preview .katex-error {
   border: 1px solid #c62828;
   background: rgba(198, 40, 40, 0.06);
   color: #c62828;
+  padding: 0.5em 0.75em;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+#preview .katex-block {
+  margin: 1em 0;
+  overflow-x: auto;
 }
 
 /* Scroll-sync anchors: zero-size invisible markers. */

@@ -182,7 +182,7 @@ Checklist (`- [ ]` / `- [x]`):
 - [x] Port the Remarkable themes (with attribution)
 - [x] Bundle OpenDyslexic
 - [x] Wire KaTeX + Mermaid
-- [ ] Draw the SpongeBob-style mascot
+- [ ] Draw the cartoon-style mascot
 - [ ] Ship on iOS and Android
 
 ### Blockquote
