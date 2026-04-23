@@ -25,3 +25,6 @@ Thumbs.db
 # Python (legacy)
 __pycache__/
 *.pyc
+
+# Local scratch / comparison sources (not shipped)
+temp/

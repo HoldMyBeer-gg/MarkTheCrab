@@ -1,35 +1,21 @@
-// Copy vendor files (highlight.js) into src/vendor for bundling
+// Copy highlight.js CSS themes into src/vendor. The hljs runtime itself is
+// bundled via src/hljs-setup.js, so no JS copy is needed.
 const fs = require("fs");
 const path = require("path");
 
 const vendorDir = path.join(__dirname, "..", "src", "vendor");
 fs.mkdirSync(vendorDir, { recursive: true });
 
-// Copy highlight.js minified
-const hljsSrc = path.join(__dirname, "..", "node_modules", "highlight.js", "lib", "index.js");
-// We'll use the pre-built CDN version which is a single file
-const hljsMin = path.join(__dirname, "..", "node_modules", "highlight.js", "highlight.min.js");
-
-// Try the pre-built version first, otherwise we'll create a small bundle note
-if (fs.existsSync(hljsMin)) {
-  fs.copyFileSync(hljsMin, path.join(vendorDir, "highlight.min.js"));
-} else {
-  // Fallback: copy the ES module entry
-  console.log("Note: highlight.min.js not found at expected path, will need manual copy");
-}
-
-// Copy a highlight.js CSS theme
 const cssThemes = [
-  "github.min.css",
-  "github-dark.min.css",
+  ["github.min.css", "hljs-github.css"],
+  ["github-dark.min.css", "hljs-github-dark.css"],
 ];
 
-for (const theme of cssThemes) {
-  const src = path.join(__dirname, "..", "node_modules", "highlight.js", "styles", theme);
-  if (fs.existsSync(src)) {
-    const dest = theme === "github.min.css" ? "hljs-github.css" : "hljs-github-dark.css";
-    fs.copyFileSync(src, path.join(vendorDir, dest));
+for (const [src, dest] of cssThemes) {
+  const srcPath = path.join(__dirname, "..", "node_modules", "highlight.js", "styles", src);
+  if (fs.existsSync(srcPath)) {
+    fs.copyFileSync(srcPath, path.join(vendorDir, dest));
   }
 }
 
-console.log("Vendor files copied to src/vendor/");
+console.log("Vendor CSS copied to src/vendor/");

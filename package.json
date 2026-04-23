@@ -1,11 +1,11 @@
 {
-  "name": "remarkable",
+  "name": "markthecrab",
   "version": "0.1.0",
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
-    "build": "esbuild src/app.js --bundle --outfile=src/dist/app.js --format=esm --minify && node scripts/copy-vendor.js",
-    "dev": "esbuild src/app.js --bundle --outfile=src/dist/app.js --format=esm --watch --sourcemap",
+    "build": "esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting && node scripts/copy-vendor.js",
+    "dev": "esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap",
     "tauri": "tauri"
   },
   "devDependencies": {
