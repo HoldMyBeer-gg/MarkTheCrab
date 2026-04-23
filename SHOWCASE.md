@@ -12,8 +12,8 @@
 MarkTheCrab is a cross-platform markdown editor built in Rust (via
 Tauri), with CodeMirror running the editor and pulldown-cmark rendering
 the live preview. It's a spiritual successor to
-[Remarkable](https://github.com/jamiemcg/Remarkable) — rebuilt for 2026,
-with the features its users asked for and the bugs swept out.
+[Remarkable](https://github.com/jamiemcg/Remarkable) — rebuilt from scratch
+for 2026 with a modern cross-platform stack.
 
 The idea: open this file to see every feature at once. Everything on the
 left is honest markdown; everything on the right is what MarkTheCrab
@@ -21,9 +21,7 @@ renders from it.
 
 ---
 
-## Features people wanted
-
-Pulled straight from Remarkable's issue tracker, delivered here.
+## Features
 
 ### Math with KaTeX
 
