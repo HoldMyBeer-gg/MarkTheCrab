@@ -136,6 +136,108 @@ html, body {
   margin: 0 auto;
 }
 
+/* Preview-pane spacing baseline. Themes load after this file and can
+   override any rule; the goal here is just to prevent the bunched-up
+   look in themes that don't set their own block spacing (e.g. Metro
+   Vibes). */
+#preview h1,
+#preview h2,
+#preview h3,
+#preview h4,
+#preview h5,
+#preview h6 {
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
+  line-height: 1.25;
+}
+#preview > :first-child {
+  margin-top: 0;
+}
+#preview p,
+#preview ul,
+#preview ol,
+#preview dl,
+#preview pre,
+#preview blockquote,
+#preview table,
+#preview figure {
+  margin: 0 0 1em 0;
+}
+#preview ul,
+#preview ol {
+  padding-left: 1.75em;
+}
+#preview li {
+  margin-bottom: 0.25em;
+}
+#preview li > ul,
+#preview li > ol {
+  margin: 0.25em 0 0.25em 0;
+}
+#preview blockquote {
+  padding: 0.25em 1em;
+}
+#preview hr {
+  margin: 2em 0;
+}
+#preview table {
+  border-collapse: collapse;
+}
+#preview img {
+  max-width: 100%;
+  height: auto;
+}
+#preview .toc {
+  margin: 1em 0 1.5em;
+  padding: 0.75em 1em;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  font-size: 0.95em;
+}
+#preview .toc ul {
+  margin: 0;
+  padding-left: 1.4em;
+  list-style: disc;
+}
+#preview .toc > ul {
+  padding-left: 1.2em;
+}
+#preview .toc li {
+  margin: 0.15em 0;
+}
+#preview .toc a {
+  text-decoration: none;
+}
+#preview .toc a:hover {
+  text-decoration: underline;
+}
+
+#preview .mermaid {
+  margin: 1em 0;
+  display: flex;
+  justify-content: center;
+}
+#preview .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+#preview .mermaid-error {
+  border: 1px solid #c62828;
+  background: rgba(198, 40, 40, 0.06);
+  color: #c62828;
+}
+
+/* Scroll-sync anchors: zero-size invisible markers. */
+#preview a.src-line {
+  display: block;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+}
+
 /* Find bar */
 .findbar {
   position: fixed;
@@ -292,7 +394,8 @@ html, body {
   max-width: 90vw;
 }
 
-#about-credits {
+#about-credits,
+#custom-css-input {
   width: 100%;
   height: min(60vh, 480px);
   margin-top: 8px;
@@ -305,6 +408,18 @@ html, body {
   font-size: 12px;
   line-height: 1.5;
   resize: vertical;
+}
+
+.custom-css-dialog {
+  width: min(720px, 90vw);
+  max-width: 90vw;
+}
+.custom-css-dialog code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--bg-tertiary);
+  padding: 0 4px;
+  border-radius: 3px;
 }
 
 .dialog-buttons button {

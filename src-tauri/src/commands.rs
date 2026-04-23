@@ -41,6 +41,14 @@ pub fn get_credits() -> String {
             include_str!("../third-party-licenses/highlight.js-BSD3.txt"),
         ),
         (
+            "KaTeX — MIT",
+            include_str!("../third-party-licenses/KaTeX-MIT.txt"),
+        ),
+        (
+            "Mermaid — MIT",
+            include_str!("../third-party-licenses/Mermaid-MIT.txt"),
+        ),
+        (
             "pulldown-cmark — MIT",
             include_str!("../third-party-licenses/pulldown-cmark.txt"),
         ),
@@ -120,6 +128,44 @@ pub fn read_file(path: &str) -> Result<String, String> {
 #[tauri::command]
 pub fn write_file(path: &str, content: &str) -> Result<(), String> {
     fs::write(path, content).map_err(|e| e.to_string())
+}
+
+fn mtime_ms(meta: &std::fs::Metadata) -> Result<u64, String> {
+    meta.modified()
+        .map_err(|e| e.to_string())?
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())
+        .map(|d| d.as_millis() as u64)
+}
+
+#[tauri::command]
+pub fn read_file_with_mtime(path: &str) -> Result<(String, u64), String> {
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    Ok((content, mtime_ms(&meta)?))
+}
+
+#[tauri::command]
+pub fn write_file_with_mtime(path: &str, content: &str) -> Result<u64, String> {
+    fs::write(path, content).map_err(|e| e.to_string())?;
+    let meta = fs::metadata(path).map_err(|e| e.to_string())?;
+    mtime_ms(&meta)
+}
+
+// Returns the current mtime for a path, or None if the file no longer
+// exists (e.g. moved or deleted externally while open).
+#[tauri::command]
+pub fn stat_mtime(path: &str) -> Result<Option<u64>, String> {
+    match fs::metadata(path) {
+        Ok(meta) => Ok(Some(mtime_ms(&meta)?)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn confirm_close(window: tauri::Window) {
+    let _ = window.destroy();
 }
 
 #[tauri::command]
@@ -237,6 +283,7 @@ fn get_theme_css(theme: &str) -> &'static str {
         "foghorn" => include_str!("../../src/themes/foghorn.css"),
         "github" => include_str!("../../src/themes/github.css"),
         "handwriting" => include_str!("../../src/themes/handwriting.css"),
+        "markdown" => include_str!("../../src/themes/markdown.css"),
         "metro-vibes" => include_str!("../../src/themes/metro-vibes.css"),
         "metro-vibes-dark" => include_str!("../../src/themes/metro-vibes-dark.css"),
         "modern" => include_str!("../../src/themes/modern.css"),
