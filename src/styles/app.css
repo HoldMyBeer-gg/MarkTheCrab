@@ -554,3 +554,111 @@ body.font-opendyslexic .cm-gutters {
     color: #000 !important;
   }
 }
+/* Mascot layer — append to styles/app.css */
+
+/* Empty-editor overlay */
+.editor-pane { position: relative; }
+.mascot-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 400ms ease-out;
+  z-index: 5;
+}
+.mascot-overlay.visible { opacity: 1; }
+.mascot-overlay::after {
+  content: "Drop a .md file or start typing";
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Preview thinking corner */
+.preview-pane { position: relative; }
+.mascot-corner {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+  pointer-events: none;
+  z-index: 5;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 4px 10px 4px 4px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mascot-corner.visible { opacity: 1; }
+.mascot-corner::after {
+  content: "rendering…";
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Statusbar flash slot */
+.mascot-slot {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 0;
+}
+.mascot-slot .mascot {
+  position: absolute;
+  bottom: -4px;
+  left: -16px;
+}
+
+/* About dialog header */
+.about-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.about-header h3 { margin: 0; font-size: 20px; }
+.about-tag { margin: 2px 0 0; color: var(--text-secondary); font-size: 12px; }
+.about-mascot { width: 96px; height: 96px; flex-shrink: 0; }
+
+/* Welcome dialog */
+.welcome-dialog { text-align: center; max-width: 360px; }
+.welcome-mascot { width: 140px; height: 140px; margin: 0 auto; }
+.welcome-tag { color: var(--text-secondary); font-style: italic; margin: -4px 0 12px; }
+.welcome-dialog kbd {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+/* Inline error card (replaces silent mermaid/katex error tooltips) */
+.mascot-error-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(255, 85, 119, 0.06);
+  border: 1px solid rgba(255, 85, 119, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.mascot-error-card .mascot { flex-shrink: 0; width: 56px; height: 56px; }
+.mascot-error-body { flex: 1; font-size: 13px; line-height: 1.5; }
+.mascot-error-title { font-weight: 600; color: #c94a15; margin-bottom: 4px; }
+.mascot-error-msg {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}

@@ -1,5 +1,6 @@
 import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount } from "./editor.js";
 import hljs from "./hljs-setup.js";
+import { Mascot } from "./mascot.js";
 
 // Make hljs available globally for preview highlighting
 window.hljs = hljs;
@@ -78,8 +79,57 @@ async function init() {
   // Populate recent-files dropdown from settings
   refreshRecentFiles();
 
+  // Mascot: empty-state overlay + first-launch welcome
+  setupMascot();
+  maybeShowWelcome();
+
   // Load tutorial or empty
   updatePreview("");
+}
+
+// ────── MASCOT LAYER ──────────────────────────────────────────────
+// See handoff/README.md for the full placement rationale.
+
+let thinkingTimer = null;
+
+function setupMascot() {
+  refreshEmptyMascot();
+}
+
+function refreshEmptyMascot() {
+  const host = document.getElementById("editor-mascot");
+  if (!host) return;
+  const empty = !currentFile && !getContent(editor).trim();
+  if (empty) {
+    if (!host.querySelector(".mascot")) {
+      Mascot.show(host, "sleepy", { size: 180 });
+    }
+    host.classList.add("visible");
+  } else if (host.classList.contains("visible")) {
+    host.classList.remove("visible");
+    // Wait for the fade, then clear the DOM — but only if still non-empty.
+    setTimeout(() => {
+      if (!(!currentFile && !getContent(editor).trim())) {
+        host.innerHTML = "";
+      }
+    }, 400);
+  }
+}
+
+async function maybeShowWelcome() {
+  try {
+    const s = settings && settings.recent_files ? settings : await invoke("load_settings");
+    const first = !s.recent_files || s.recent_files.length === 0;
+    if (!first) return;
+    const dialog = document.getElementById("welcome-dialog");
+    if (!dialog) return;
+    Mascot.show("#welcome-mascot", "excited", { size: 140 });
+    dialog.showModal();
+    const go = document.getElementById("welcome-go");
+    if (go) go.onclick = () => dialog.close();
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 async function setupCloseGuard() {
@@ -248,6 +298,11 @@ function onContentChange(content) {
   const { words, chars } = getWordCount(editor);
   statusWords.textContent = `${words} words`;
   statusChars.textContent = `${chars} chars`;
+
+  // Mascot: first keystroke dismisses the sleepy overlay (and welcome card).
+  refreshEmptyMascot();
+  const welcome = document.getElementById("welcome-dialog");
+  if (welcome && welcome.open) welcome.close();
 }
 
 function onCursorChange(line, col) {
@@ -256,6 +311,17 @@ function onCursorChange(line, col) {
 
 async function updatePreview(content) {
   if (!previewVisible) return;
+
+  // Schedule a "thinking" mascot in the preview corner if render takes
+  // longer than 400ms. Cancelled below if render finishes faster.
+  clearTimeout(thinkingTimer);
+  thinkingTimer = setTimeout(() => {
+    const corner = document.getElementById("preview-mascot");
+    if (!corner) return;
+    Mascot.show(corner, "thinking", { size: 48, blink: false });
+    corner.classList.add("visible");
+  }, 400);
+
   const html = await invoke("render_markdown", { text: content });
   previewEl.innerHTML = html;
 
@@ -280,7 +346,17 @@ async function updatePreview(content) {
 
   renderFencedKatex();
   renderMathInPreview();
-  renderMermaidInPreview();
+  await renderMermaidInPreview();
+
+  // Render done — cancel the pending thinking mascot or hide it if shown.
+  clearTimeout(thinkingTimer);
+  const corner = document.getElementById("preview-mascot");
+  if (corner && corner.classList.contains("visible")) {
+    corner.classList.remove("visible");
+    setTimeout(() => {
+      if (!corner.classList.contains("visible")) corner.innerHTML = "";
+    }, 320);
+  }
 }
 
 // Render fenced ```katex / ```math code blocks as display-mode KaTeX.
@@ -299,8 +375,7 @@ async function renderFencedKatex() {
       try {
         katex.render(source, container, { displayMode: true, throwOnError: false });
       } catch (err) {
-        container.classList.add("katex-error");
-        container.textContent = String(err && err.message ? err.message : err);
+        renderMascotErrorCard(container, "KaTeX error", err);
       }
       pre.replaceWith(container);
     }
@@ -344,10 +419,30 @@ async function renderMermaidInPreview() {
       container.innerHTML = svg;
       pre.replaceWith(container);
     } catch (err) {
-      pre.classList.add("mermaid-error");
-      pre.title = String(err && err.message ? err.message : err);
+      const card = document.createElement("div");
+      renderMascotErrorCard(card, "Mermaid parse error", err);
+      pre.replaceWith(card);
     }
   }
+}
+
+// Shared helper: replaces a silent tooltip with an inline mascot-led error.
+function renderMascotErrorCard(host, title, err) {
+  const msg = String(err && err.message ? err.message : err);
+  host.className = "mascot-error-card";
+  host.innerHTML = "";
+  host.appendChild(Mascot.build("error", 56));
+  const body = document.createElement("div");
+  body.className = "mascot-error-body";
+  const titleEl = document.createElement("div");
+  titleEl.className = "mascot-error-title";
+  titleEl.textContent = title;
+  const msgEl = document.createElement("div");
+  msgEl.className = "mascot-error-msg";
+  msgEl.textContent = msg;
+  body.appendChild(titleEl);
+  body.appendChild(msgEl);
+  host.appendChild(body);
 }
 
 // KaTeX auto-render. Lazily loads the library on first use so docs without
@@ -432,6 +527,7 @@ async function newFile() {
   statusModified.classList.add("hidden");
   await invoke("set_current_file", { path: null });
   updatePreview("");
+  refreshEmptyMascot();
 }
 
 async function openFile() {
@@ -456,6 +552,7 @@ async function loadFile(path) {
   await invoke("set_current_file", { path });
   updatePreview(content);
   await refreshRecentFiles();
+  refreshEmptyMascot();
 }
 
 async function refreshRecentFiles() {
@@ -521,6 +618,7 @@ async function saveFile() {
   currentFileMtime = await invoke("write_file_with_mtime", { path: currentFile, content });
   isModified = false;
   statusModified.classList.add("hidden");
+  Mascot.flash("#mascot-slot", "celebrating", 1200, 32);
   await refreshRecentFiles();
 }
 
@@ -873,6 +971,7 @@ let creditsCache = null;
 async function showAbout() {
   const dialog = document.getElementById("about-dialog");
   const textarea = document.getElementById("about-credits");
+  Mascot.show("#about-mascot", "happy", { size: 96 });
   if (creditsCache == null) {
     try {
       creditsCache = await invoke("get_credits");
