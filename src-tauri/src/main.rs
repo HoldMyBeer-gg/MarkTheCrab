@@ -7,6 +7,7 @@ mod settings;
 
 use commands::AppState;
 use settings::Settings;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, WindowEvent};
 
@@ -42,9 +43,25 @@ fn main() {
             // Intercept close; let the frontend decide whether to proceed
             // based on unsaved state. The frontend calls `confirm_close`
             // to actually destroy the window.
+            //
+            // Safety valve: if the frontend never responded (JS crashed,
+            // webview broken), a second close attempt forces the window
+            // to close so the user isn't trapped.
+            static CLOSE_PENDING: AtomicBool = AtomicBool::new(false);
             if let WindowEvent::CloseRequested { api, .. } = event {
+                if CLOSE_PENDING.swap(true, Ordering::SeqCst) {
+                    // Second attempt — force close
+                    let _ = window.destroy();
+                    return;
+                }
                 api.prevent_close();
                 let _ = window.emit("mtc:close-requested", ());
+
+                // Reset after 3 seconds so normal usage isn't affected
+                std::thread::spawn(|| {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    CLOSE_PENDING.store(false, Ordering::SeqCst);
+                });
             }
         })
         .run(tauri::generate_context!())
