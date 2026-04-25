@@ -12,9 +12,9 @@
     "windows": [
       {
         "title": "MarkTheCrab",
-        "width": 1200,
+        "width": 1308,
         "height": 800,
-        "minWidth": 600,
+        "minWidth": 950,
         "minHeight": 400
       }
     ],
