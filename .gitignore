@@ -4,6 +4,7 @@ node_modules/
 # Build output
 src/dist/
 src-tauri/target/
+src-tauri/gen/
 
 # Vendor (generated from npm packages)
 src/vendor/
