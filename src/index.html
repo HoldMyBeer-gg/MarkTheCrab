@@ -10,7 +10,7 @@
 </head>
 <body>
   <!-- Toolbar -->
-  <nav id="toolbar" class="toolbar" aria-label="Toolbar">
+  <div id="toolbar" class="toolbar" role="navigation" aria-label="Toolbar">
     <div class="toolbar-group" role="group" aria-label="File">
       <button data-action="new" title="New (Ctrl+N)" aria-label="New file">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -97,10 +97,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
     </div>
-  </nav>
+  </div>
 
   <!-- Main content area -->
-  <main id="main" class="main horizontal">
+  <div id="main" class="main horizontal" role="main">
     <!-- Editor pane -->
     <div id="editor-pane" class="pane editor-pane" role="region" aria-label="Editor">
       <div id="editor"></div>
@@ -117,7 +117,7 @@
       <!-- Thinking corner: fades in when render takes >400ms, out when done -->
       <div id="preview-mascot" class="mascot-corner" aria-hidden="true"></div>
     </div>
-  </main>
+  </div>
 
   <!-- Find bar -->
   <div id="findbar" class="findbar hidden" role="search" aria-label="Find and replace" aria-hidden="true">
@@ -139,7 +139,7 @@
   </div>
 
   <!-- Status bar -->
-  <footer id="statusbar" class="statusbar" aria-label="Document status">
+  <div id="statusbar" class="statusbar" role="contentinfo" aria-label="Document status">
     <span id="status-file">Untitled</span>
     <span id="status-modified" class="hidden" aria-label="Unsaved changes">*</span>
     <span id="mascot-slot" class="mascot-slot" aria-hidden="true"></span>
@@ -147,7 +147,7 @@
     <span id="status-cursor" aria-label="Cursor position">Ln 1, Col 1</span>
     <span id="status-words" aria-label="Word count">0 words</span>
     <span id="status-chars" aria-label="Character count">0 chars</span>
-  </footer>
+  </div>
 
   <!-- Dialogs -->
   <dialog id="link-dialog" class="app-dialog" aria-labelledby="link-dialog-title">
