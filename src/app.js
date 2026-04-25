@@ -166,6 +166,7 @@ function applySettings() {
   if (settings.vertical_layout) {
     mainEl.classList.remove("horizontal");
     mainEl.classList.add("vertical");
+    document.querySelector('[data-action="toggle-layout"]')?.setAttribute("aria-pressed", "true");
   }
 
   themeSelect.value = settings.theme;
@@ -764,6 +765,7 @@ function togglePreview(show) {
     document.getElementById("resizer").classList.add("hidden");
   }
 
+  document.querySelector('[data-action="toggle-preview"]')?.setAttribute("aria-pressed", String(show));
   settings.live_preview = show;
   invoke("update_setting", { key: "live_preview", value: String(show) });
 }
@@ -772,6 +774,7 @@ function toggleLayout() {
   const isVertical = mainEl.classList.contains("vertical");
   mainEl.classList.toggle("horizontal", isVertical);
   mainEl.classList.toggle("vertical", !isVertical);
+  document.querySelector('[data-action="toggle-layout"]')?.setAttribute("aria-pressed", String(!isVertical));
   settings.vertical_layout = !isVertical;
   invoke("update_setting", { key: "vertical_layout", value: String(!isVertical) });
 }
@@ -891,6 +894,7 @@ function setupShortcuts() {
 
     if (e.key === "Escape") {
       findbarEl.classList.add("hidden");
+      findbarEl.setAttribute("aria-hidden", "true");
     }
   });
 }
@@ -1065,14 +1069,18 @@ async function showAbout() {
 // Find bar
 function toggleFindbar() {
   findbarEl.classList.toggle("hidden");
-  if (!findbarEl.classList.contains("hidden")) {
+  const visible = !findbarEl.classList.contains("hidden");
+  findbarEl.setAttribute("aria-hidden", String(!visible));
+  if (visible) {
     document.getElementById("find-input").focus();
   }
 }
 
 function setupFindbar() {
-  document.getElementById("find-close").onclick = () =>
+  document.getElementById("find-close").onclick = () => {
     findbarEl.classList.add("hidden");
+    findbarEl.setAttribute("aria-hidden", "true");
+  };
 
   // Basic find implementation using CodeMirror search
   // The actual search is handled by CodeMirror's built-in search via Ctrl+F
