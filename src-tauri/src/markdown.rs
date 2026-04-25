@@ -150,7 +150,9 @@ fn pandoc_delims_to_dollars(input: &str) -> String {
 
 fn mask_math(input: &str, sidebar: &mut Vec<String>) -> String {
     // Display math first so `$$...$$` doesn't get consumed by the inline pass.
-    let display = regex_lite::Regex::new(r"\$\$[\s\S]+?\$\$").unwrap();
+    // Stop at \u{E000} (CODE_OPEN sentinel) so a $$...$$  whose opening and
+    // closing delimiters straddle a code fence don't consume the fence.
+    let display = regex_lite::Regex::new(r"\$\$[^\u{E000}]+?\$\$").unwrap();
     let inline_multi = regex_lite::Regex::new(r"\$[^\s$][^$\n]*?[^\s$]\$").unwrap();
     let inline_single = regex_lite::Regex::new(r"\$[^\s$]\$").unwrap();
     let mut out = input.to_string();
@@ -841,6 +843,17 @@ mod tests {
     fn test_checklist() {
         let result = render_markdown("- [ ] todo\n- [x] done");
         assert!(result.contains("type=\"checkbox\""));
+    }
+
+    #[test]
+    fn test_display_math_before_code_fence() {
+        // An opening $$ whose closing $$ comes *after* a code fence must not
+        // cause the display-math regex to consume the fence sentinel and pull
+        // post-fence content into the math block.
+        let input = "$$E = mc^2\n\n```bash\necho hello\n```\n\nafter $$end$$";
+        let result = render_markdown(input);
+        assert!(result.contains("<code"), "code fence lost: {result}");
+        assert!(result.contains("after"), "content after fence lost: {result}");
     }
 
     #[test]
