@@ -310,8 +310,10 @@ function onCursorChange(line, col) {
   statusCursor.textContent = `Ln ${line}, Col ${col}`;
 }
 
+let _renderGen = 0;
 async function updatePreview(content) {
   if (!previewVisible) return;
+  const gen = ++_renderGen;
 
   // Schedule a "thinking" mascot in the preview corner if render takes
   // longer than 400ms. Cancelled below if render finishes faster.
@@ -324,6 +326,7 @@ async function updatePreview(content) {
   }, 400);
 
   const html = await invoke("render_markdown", { text: content });
+  if (gen !== _renderGen) return;
   previewEl.innerHTML = html;
 
   resolvePreviewImageSrcs();
