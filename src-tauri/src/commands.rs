@@ -132,7 +132,7 @@ pub fn read_file(path: &str) -> Result<String, String> {
 
 #[tauri::command]
 pub fn write_file(path: &str, content: &str) -> Result<(), String> {
-    fs::write(path, content).map_err(|e| e.to_string())
+    fs::write(path, trim_trailing_whitespace(content)).map_err(|e| e.to_string())
 }
 
 fn mtime_ms(meta: &std::fs::Metadata) -> Result<u64, String> {
@@ -152,9 +152,21 @@ pub fn read_file_with_mtime(path: &str) -> Result<(String, u64), String> {
 
 #[tauri::command]
 pub fn write_file_with_mtime(path: &str, content: &str) -> Result<u64, String> {
-    fs::write(path, content).map_err(|e| e.to_string())?;
+    fs::write(path, trim_trailing_whitespace(content)).map_err(|e| e.to_string())?;
     let meta = fs::metadata(path).map_err(|e| e.to_string())?;
     mtime_ms(&meta)
+}
+
+fn trim_trailing_whitespace(content: &str) -> String {
+    let mut out = content
+        .lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n");
+    if content.ends_with('\n') {
+        out.push('\n');
+    }
+    out
 }
 
 // Returns the current mtime for a path, or None if the file no longer
