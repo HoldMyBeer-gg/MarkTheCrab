@@ -184,8 +184,6 @@ export const Mascot = {
   build(expression, size = 48) {
     return buildMascot(expression, size);
   },
-
-  palette: PALETTE,
 };
 
 export default Mascot;
