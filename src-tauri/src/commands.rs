@@ -226,7 +226,12 @@ pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &
             extra_css = if custom_css.is_empty() {
                 String::new()
             } else {
-                format!("<style>{custom_css}</style>")
+                // The HTML RAWTEXT parser closes <style> on "</style", so
+                // escape "</" → "<\/" which the parser rejects as an invalid
+                // tag-name start and treats as literal text. CSS sees "\/" as
+                // just "/" (backslash-escape of a non-special char is a no-op).
+                let safe = custom_css.replace("</", "<\\/");
+                format!("<style>{safe}</style>")
             },
         )
     } else {

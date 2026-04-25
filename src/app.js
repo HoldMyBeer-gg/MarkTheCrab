@@ -202,7 +202,13 @@ function applyFontFamily(stored) {
   if (editor) setFontFamily(editor, FONT_FAMILIES[key] || "");
 }
 
+const KNOWN_THEMES = new Set([
+  "dark", "foghorn", "github", "handwriting", "markdown",
+  "metro-vibes", "metro-vibes-dark", "modern", "solarized-dark", "solarized-light",
+]);
+
 async function applyTheme(themeName) {
+  if (!KNOWN_THEMES.has(themeName)) themeName = "github";
   if (currentThemeLink) {
     currentThemeLink.remove();
     currentThemeLink = null;
@@ -453,6 +459,21 @@ async function renderFencedKatex() {
   }
 }
 
+// Strip script elements and event-handler attributes from an SVG string.
+// Mermaid's securityLevel:"strict" runs DOMPurify internally, but defence-in-depth
+// is cheap and mermaid has had several XSS CVEs in past releases.
+function sanitizeSvg(svgString) {
+  const div = document.createElement("div");
+  div.innerHTML = svgString;
+  div.querySelectorAll("script").forEach((el) => el.remove());
+  div.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((attr) => {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+    });
+  });
+  return div.innerHTML;
+}
+
 // Mermaid diagrams from ```mermaid fenced blocks. Same lazy strategy.
 let mermaidPromise = null;
 let mermaidBlockCounter = 0;
@@ -500,8 +521,9 @@ async function renderMermaidInPreview() {
       try {
         const { svg } = await mermaid.render(id, source);
         document.getElementById(`d${id}`)?.remove();
-        container.innerHTML = svg;
-        cachePut(mermaidCache, source, svg);
+        const safeSvg = sanitizeSvg(svg);
+        container.innerHTML = safeSvg;
+        cachePut(mermaidCache, source, safeSvg);
       } catch (err) {
         document.getElementById(`d${id}`)?.remove();
         renderMascotErrorCard(container, "Mermaid parse error", err);
@@ -1137,6 +1159,12 @@ function doFind(direction) {
     return;
   }
 
+  // Avoid UI freeze from catastrophic backtracking on huge documents.
+  if (isRegex && content.length > 500_000) {
+    document.getElementById("find-count").textContent = "Doc too large for realtime regex";
+    return;
+  }
+
   const matches = [...content.matchAll(pattern)];
   document.getElementById("find-count").textContent =
     matches.length > 0 ? `${matches.length} matches` : "No matches";
@@ -1211,10 +1239,13 @@ function setupDragDrop() {
         const text = await file.text();
         setContent(editor, text);
         currentFile = null;
+        currentFileMtime = null;
+        await invoke("set_current_file", { path: null });
         statusFile.textContent = file.name;
         isModified = false;
         statusModified.classList.add("hidden");
         updatePreview(text);
+        refreshEmptyMascot();
         return; // Only open one markdown file
       } else if (file.name.match(IMAGE_EXTENSIONS)) {
         // Image file: save to images/ and insert reference
