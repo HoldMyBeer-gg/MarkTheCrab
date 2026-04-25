@@ -800,7 +800,12 @@ function setupToolbar() {
     heading1: () => insertAtLineStart(editor, "# "),
     heading2: () => insertAtLineStart(editor, "## "),
     heading3: () => insertAtLineStart(editor, "### "),
-    link: () => document.getElementById("link-dialog").showModal(),
+    link: () => {
+      const sel = editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to);
+      if (sel) document.getElementById("link-text").value = sel;
+      document.getElementById("link-dialog").showModal();
+      document.getElementById("link-url").focus();
+    },
     image: () => document.getElementById("image-dialog").showModal(),
     table: () => document.getElementById("table-dialog").showModal(),
     hr: () => insertAtCursor(editor, "\n\n---\n\n"),
@@ -866,7 +871,7 @@ function setupShortcuts() {
         case "b": e.preventDefault(); wrapSelection(editor, "**"); break;
         case "i": e.preventDefault(); wrapSelection(editor, "*"); break;
         case "d": e.preventDefault(); wrapSelection(editor, "~~"); break;
-        case "l": e.preventDefault(); document.getElementById("link-dialog").showModal(); break;
+        case "l": e.preventDefault(); { const sel = editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to); if (sel) document.getElementById("link-text").value = sel; document.getElementById("link-dialog").showModal(); document.getElementById("link-url").focus(); } break;
         case "h": e.preventDefault(); insertAtCursor(editor, "\n\n---\n\n"); break;
         case "f": e.preventDefault(); toggleFindbar(); break;
         case "e": e.preventDefault(); exportHtml(true); break;
@@ -953,15 +958,21 @@ function setupResizer() {
 // Dialogs
 function setupDialogs() {
   // Link dialog
-  document.getElementById("link-cancel").onclick = () =>
-    document.getElementById("link-dialog").close();
+  const linkDialog = document.getElementById("link-dialog");
+  const clearLinkDialog = () => {
+    document.getElementById("link-url").value = "";
+    document.getElementById("link-text").value = "";
+  };
+  document.getElementById("link-cancel").onclick = () => { linkDialog.close(); clearLinkDialog(); };
   document.getElementById("link-insert").onclick = () => {
     const url = document.getElementById("link-url").value;
     const text = document.getElementById("link-text").value || url;
-    insertAtCursor(editor, `[${text}](${url})`);
-    document.getElementById("link-dialog").close();
-    document.getElementById("link-url").value = "";
-    document.getElementById("link-text").value = "";
+    const { from, to } = editor.state.selection.main;
+    const insertion = `[${text}](${url})`;
+    editor.dispatch({ changes: { from, to, insert: insertion }, selection: { anchor: from + insertion.length } });
+    editor.focus();
+    linkDialog.close();
+    clearLinkDialog();
   };
 
   // Image dialog

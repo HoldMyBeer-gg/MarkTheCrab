@@ -213,6 +213,15 @@ html, body {
   text-decoration: underline;
 }
 
+#preview li:has(> input[type="checkbox"]) {
+  list-style: none;
+  margin-left: -1.5em;
+}
+#preview li:has(> input[type="checkbox"]) > input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
+}
+
 #preview .mermaid {
   margin: 1em 0;
   display: flex;
