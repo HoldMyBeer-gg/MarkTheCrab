@@ -756,6 +756,7 @@ fn sanitize_html(html: &str) -> String {
         .add_tag_attributes("th", &["align", "colspan", "rowspan"])
         .add_tag_attributes("code", &["class"])
         .add_tag_attributes("pre", &["class"])
+        .add_tag_attributes("li", &["class"])
         .add_tag_attributes("div", &["class"])
         .add_tag_attributes("span", &["class"])
         .link_rel(Some("noopener noreferrer"))
