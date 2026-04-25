@@ -103,10 +103,7 @@ fn mask_code(input: &str, sidebar: &mut Vec<String>) -> String {
                     let (nl_lead, nl_trim) = split_leading_spaces(next);
                     if nl_lead <= 3 {
                         let run = nl_trim.chars().take_while(|&x| x == c).count();
-                        if run >= open_run
-                            && nl_trim[run..]
-                                .chars()
-                                .all(|x| x == ' ' || x == '\t')
+                        if run >= open_run && nl_trim[run..].chars().all(|x| x == ' ' || x == '\t')
                         {
                             break;
                         }
@@ -142,7 +139,9 @@ fn pandoc_delims_to_dollars(input: &str) -> String {
     let display = regex_lite::Regex::new(r"\\\[([\s\S]+?)\\\]").unwrap();
     let inline = regex_lite::Regex::new(r"\\\(([^\n]+?)\\\)").unwrap();
     let s = display
-        .replace_all(input, |caps: &regex_lite::Captures| format!("$${}$$", &caps[1]))
+        .replace_all(input, |caps: &regex_lite::Captures| {
+            format!("$${}$$", &caps[1])
+        })
         .into_owned();
     inline
         .replace_all(&s, |caps: &regex_lite::Captures| format!("${}$", &caps[1]))
@@ -192,15 +191,15 @@ fn restore_sentinels(input: &str, sidebar: &[String], open: char, close: char) -
                     break;
                 }
             }
-            if let Some(&(_, p)) = iter.peek() {
-                if p == close {
-                    iter.next();
-                    if let Ok(idx) = num.parse::<usize>() {
-                        if let Some(orig) = sidebar.get(idx) {
-                            out.push_str(orig);
-                            continue;
-                        }
-                    }
+            if let Some(&(_, p)) = iter.peek()
+                && p == close
+            {
+                iter.next();
+                if let Ok(idx) = num.parse::<usize>()
+                    && let Some(orig) = sidebar.get(idx)
+                {
+                    out.push_str(orig);
+                    continue;
                 }
             }
             // Malformed sentinel: emit what we swallowed as-is
@@ -252,7 +251,13 @@ fn assign_heading_ids<'a>(events: Vec<Event<'a>>) -> (Vec<Event<'a>>, Vec<Headin
 
     let mut i = 0;
     while i < events.len() {
-        if let Event::Start(Tag::Heading { level, id, classes, attrs }) = &events[i] {
+        if let Event::Start(Tag::Heading {
+            level,
+            id,
+            classes,
+            attrs,
+        }) = &events[i]
+        {
             let level = *level;
             // Scan forward to gather plain text of the heading body
             let mut text = String::new();
@@ -269,7 +274,11 @@ fn assign_heading_ids<'a>(events: Vec<Event<'a>>) -> (Vec<Event<'a>>, Vec<Headin
                 Some(existing) => existing.to_string(),
                 None => {
                     let base = slugify(&text);
-                    let base = if base.is_empty() { "section".to_string() } else { base };
+                    let base = if base.is_empty() {
+                        "section".to_string()
+                    } else {
+                        base
+                    };
                     let count = slug_counts.entry(base.clone()).or_insert(0);
                     let unique = if *count == 0 {
                         base.clone()
@@ -385,11 +394,11 @@ struct TocNode {
 }
 
 fn insert_toc_node(siblings: &mut Vec<TocNode>, node: TocNode) {
-    if let Some(last) = siblings.last_mut() {
-        if node.level > last.level {
-            insert_toc_node(&mut last.children, node);
-            return;
-        }
+    if let Some(last) = siblings.last_mut()
+        && node.level > last.level
+    {
+        insert_toc_node(&mut last.children, node);
+        return;
     }
     siblings.push(node);
 }
@@ -445,23 +454,21 @@ fn inject_source_markers<'a>(
     let mut out = Vec::with_capacity(events_with_offsets.len() * 2);
     let mut depth: i32 = 0;
     for (event, range) in events_with_offsets {
-        let is_top_start = matches!(&event, Event::Start(tag) if is_top_block_start(tag)) && depth == 0;
+        let is_top_start =
+            matches!(&event, Event::Start(tag) if is_top_block_start(tag)) && depth == 0;
         if is_top_start {
             let line = byte_offset_to_line(range.start, line_starts);
-            let marker = format!(
-                "<a class=\"src-line\" data-src-line=\"{}\"></a>",
-                line
-            );
+            let marker = format!("<a class=\"src-line\" data-src-line=\"{}\"></a>", line);
             out.push(Event::Html(CowStr::Boxed(marker.into_boxed_str())));
         }
         if let Event::Start(tag) = &event {
             if is_top_block_start(tag) {
                 depth += 1;
             }
-        } else if let Event::End(tag_end) = &event {
-            if is_top_block_end(tag_end) {
-                depth -= 1;
-            }
+        } else if let Event::End(tag_end) = &event
+            && is_top_block_end(tag_end)
+        {
+            depth -= 1;
         }
         out.push(event);
     }
@@ -536,31 +543,31 @@ fn process_highlight(line: &str) -> String {
     let mut last_end = 0;
 
     while let Some((i, c)) = chars.next() {
-        if c == '=' {
-            if let Some(&(_, '=')) = chars.peek() {
-                chars.next();
-                // Find closing ==
-                let start = i + 2;
-                let mut found_end = false;
-                let search = &line[start..];
-                if let Some(end_pos) = search.find("==") {
-                    result.push_str(&line[last_end..i]);
-                    result.push_str("<mark>");
-                    result.push_str(&search[..end_pos]);
-                    result.push_str("</mark>");
-                    last_end = start + end_pos + 2;
-                    // Advance chars past the closing ==
-                    while let Some(&(idx, _)) = chars.peek() {
-                        if idx >= last_end {
-                            break;
-                        }
-                        chars.next();
+        if c == '='
+            && let Some(&(_, '=')) = chars.peek()
+        {
+            chars.next();
+            // Find closing ==
+            let start = i + 2;
+            let mut found_end = false;
+            let search = &line[start..];
+            if let Some(end_pos) = search.find("==") {
+                result.push_str(&line[last_end..i]);
+                result.push_str("<mark>");
+                result.push_str(&search[..end_pos]);
+                result.push_str("</mark>");
+                last_end = start + end_pos + 2;
+                // Advance chars past the closing ==
+                while let Some(&(idx, _)) = chars.peek() {
+                    if idx >= last_end {
+                        break;
                     }
-                    found_end = true;
+                    chars.next();
                 }
-                if !found_end {
-                    continue;
-                }
+                found_end = true;
+            }
+            if !found_end {
+                continue;
             }
         }
     }
@@ -612,32 +619,26 @@ fn replace_paired_marker(line: &str, marker: char, tag: &str) -> String {
     let mut result = String::new();
     let mut rest = line;
 
-    loop {
-        if let Some(start) = rest.find(marker) {
-            let after_start = &rest[start + marker.len_utf8()..];
-            if let Some(end) = after_start.find(marker) {
-                let content = &after_start[..end];
-                if !content.is_empty() && !content.contains(' ') {
-                    result.push_str(&rest[..start]);
-                    result.push_str(&format!("<{tag}>{content}</{tag}>"));
-                    rest = &after_start[end + marker.len_utf8()..];
-                    continue;
-                }
+    while let Some(start) = rest.find(marker) {
+        let after_start = &rest[start + marker.len_utf8()..];
+        if let Some(end) = after_start.find(marker) {
+            let content = &after_start[..end];
+            if !content.is_empty() && !content.contains(' ') {
+                result.push_str(&rest[..start]);
+                result.push_str(&format!("<{tag}>{content}</{tag}>"));
+                rest = &after_start[end + marker.len_utf8()..];
+                continue;
             }
-            result.push_str(&rest[..start + marker.len_utf8()]);
-            rest = &rest[start + marker.len_utf8()..];
-        } else {
-            break;
         }
+        result.push_str(&rest[..start + marker.len_utf8()]);
+        rest = &rest[start + marker.len_utf8()..];
     }
     result.push_str(rest);
     result
 }
 
 fn postprocess_autolinks(events: Vec<Event>) -> Vec<Event> {
-    let url_pattern = regex_lite::Regex::new(
-        r"(https?://[^\s<>\[\]()]+)"
-    ).unwrap();
+    let url_pattern = regex_lite::Regex::new(r"(https?://[^\s<>\[\]()]+)").unwrap();
 
     let mut result = Vec::with_capacity(events.len());
     let mut in_link = false;
@@ -675,9 +676,7 @@ fn postprocess_autolinks(events: Vec<Event>) -> Vec<Event> {
                         last_end = mat.end();
                     }
                     if last_end < text_str.len() {
-                        result.push(Event::Text(
-                            text_str[last_end..].to_string().into(),
-                        ));
+                        result.push(Event::Text(text_str[last_end..].to_string().into()));
                     }
                 } else {
                     result.push(event);
@@ -697,18 +696,52 @@ fn postprocess_custom_html(_html: &str) -> String {
 fn sanitize_html(html: &str) -> String {
     ammonia::Builder::new()
         .add_tags(&[
-            "mark", "sup", "sub", "details", "summary",
-            "table", "thead", "tbody", "tr", "th", "td",
-            "h1", "h2", "h3", "h4", "h5", "h6",
-            "p", "br", "hr", "div", "span",
-            "ul", "ol", "li",
-            "a", "img",
-            "pre", "code", "blockquote",
-            "strong", "em", "del", "s",
+            "mark",
+            "sup",
+            "sub",
+            "details",
+            "summary",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "th",
+            "td",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "p",
+            "br",
+            "hr",
+            "div",
+            "span",
+            "ul",
+            "ol",
+            "li",
+            "a",
+            "img",
+            "pre",
+            "code",
+            "blockquote",
+            "strong",
+            "em",
+            "del",
+            "s",
             "input",
-            "dl", "dt", "dd",
-            "figure", "figcaption",
-            "abbr", "cite", "dfn", "kbd", "samp", "var",
+            "dl",
+            "dt",
+            "dd",
+            "figure",
+            "figcaption",
+            "abbr",
+            "cite",
+            "dfn",
+            "kbd",
+            "samp",
+            "var",
         ])
         .add_tag_attributes("a", &["href", "title", "target", "class", "data-src-line"])
         .add_tag_attributes("h1", &["id"])
@@ -866,7 +899,11 @@ mod tests {
             result
         );
         // Guard against extra leading $ sneaking in (a bug I shipped once).
-        assert!(!result.contains("$$a^2"), "inline got triple-dollared: {}", result);
+        assert!(
+            !result.contains("$$a^2"),
+            "inline got triple-dollared: {}",
+            result
+        );
 
         let result = render_markdown("\\[\\nabla \\cdot \\vec{E}\\]");
         assert!(
@@ -874,7 +911,11 @@ mod tests {
             "expected double dollars, got: {}",
             result
         );
-        assert!(!result.contains("$$$"), "display got triple-dollared: {}", result);
+        assert!(
+            !result.contains("$$$"),
+            "display got triple-dollared: {}",
+            result
+        );
     }
 
     #[test]
@@ -908,6 +949,10 @@ mod tests {
             "display form missing in: {}",
             result
         );
-        assert!(!result.contains("$$$"), "extra dollar sneaked in: {}", result);
+        assert!(
+            !result.contains("$$$"),
+            "extra dollar sneaked in: {}",
+            result
+        );
     }
 }
