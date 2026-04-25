@@ -496,9 +496,11 @@ async function renderMermaidInPreview() {
       const id = `mtc-mermaid-${++mermaidBlockCounter}`;
       try {
         const { svg } = await mermaid.render(id, source);
+        document.getElementById(`d${id}`)?.remove();
         container.innerHTML = svg;
         cachePut(mermaidCache, source, svg);
       } catch (err) {
+        document.getElementById(`d${id}`)?.remove();
         renderMascotErrorCard(container, "Mermaid parse error", err);
       }
     };
