@@ -853,7 +853,10 @@ mod tests {
         let input = "$$E = mc^2\n\n```bash\necho hello\n```\n\nafter $$end$$";
         let result = render_markdown(input);
         assert!(result.contains("<code"), "code fence lost: {result}");
-        assert!(result.contains("after"), "content after fence lost: {result}");
+        assert!(
+            result.contains("after"),
+            "content after fence lost: {result}"
+        );
     }
 
     #[test]
