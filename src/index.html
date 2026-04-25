@@ -10,69 +10,69 @@
 </head>
 <body>
   <!-- Toolbar -->
-  <div id="toolbar" class="toolbar">
-    <div class="toolbar-group">
-      <button data-action="new" title="New (Ctrl+N)">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  <nav id="toolbar" class="toolbar" aria-label="Toolbar">
+    <div class="toolbar-group" role="group" aria-label="File">
+      <button data-action="new" title="New (Ctrl+N)" aria-label="New file">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       </button>
-      <button data-action="open" title="Open (Ctrl+O)">
-        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <button data-action="open" title="Open (Ctrl+O)" aria-label="Open file">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       </button>
-      <select id="recent-select" class="recent-select" title="Recent files" disabled>
+      <select id="recent-select" class="recent-select" title="Recent files" aria-label="Recent files" disabled>
         <option value="">Recent…</option>
       </select>
-      <button data-action="save" title="Save (Ctrl+S)">
-        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      <button data-action="save" title="Save (Ctrl+S)" aria-label="Save">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       </button>
-      <button data-action="print" title="Print / Export PDF (Ctrl+P)">
-        <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      <button data-action="print" title="Print / Export PDF (Ctrl+P)" aria-label="Print or export PDF">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       </button>
     </div>
-    <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button data-action="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>
-      <button data-action="italic" title="Italic (Ctrl+I)"><em>I</em></button>
-      <button data-action="strikethrough" title="Strikethrough (Ctrl+D)"><s>S</s></button>
-      <button data-action="heading1" title="Heading 1 (Ctrl+1)">H1</button>
-      <button data-action="heading2" title="Heading 2 (Ctrl+2)">H2</button>
-      <button data-action="heading3" title="Heading 3 (Ctrl+3)">H3</button>
+    <div class="toolbar-separator" role="separator" aria-orientation="vertical"></div>
+    <div class="toolbar-group" role="group" aria-label="Formatting">
+      <button data-action="bold" title="Bold (Ctrl+B)" aria-label="Bold"><strong aria-hidden="true">B</strong></button>
+      <button data-action="italic" title="Italic (Ctrl+I)" aria-label="Italic"><em aria-hidden="true">I</em></button>
+      <button data-action="strikethrough" title="Strikethrough (Ctrl+D)" aria-label="Strikethrough"><s aria-hidden="true">S</s></button>
+      <button data-action="heading1" title="Heading 1 (Ctrl+1)" aria-label="Heading 1">H1</button>
+      <button data-action="heading2" title="Heading 2 (Ctrl+2)" aria-label="Heading 2">H2</button>
+      <button data-action="heading3" title="Heading 3 (Ctrl+3)" aria-label="Heading 3">H3</button>
     </div>
-    <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button data-action="link" title="Link (Ctrl+L)">
-        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    <div class="toolbar-separator" role="separator" aria-orientation="vertical"></div>
+    <div class="toolbar-group" role="group" aria-label="Insert">
+      <button data-action="link" title="Link (Ctrl+L)" aria-label="Insert link">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
       </button>
-      <button data-action="image" title="Image (Ctrl+Shift+I)">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <button data-action="image" title="Image (Ctrl+Shift+I)" aria-label="Insert image">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
       </button>
-      <button data-action="table" title="Table (Ctrl+Shift+T)">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+      <button data-action="table" title="Table (Ctrl+Shift+T)" aria-label="Insert table">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       </button>
-      <button data-action="hr" title="Horizontal Rule (Ctrl+H)">―</button>
-      <button data-action="code" title="Code Block">{ }</button>
+      <button data-action="hr" title="Horizontal Rule (Ctrl+H)" aria-label="Insert horizontal rule"><span aria-hidden="true">―</span></button>
+      <button data-action="code" title="Code Block" aria-label="Insert code block"><span aria-hidden="true">{ }</span></button>
     </div>
-    <div class="toolbar-separator"></div>
-    <div class="toolbar-group">
-      <button data-action="ul" title="Unordered List">
-        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+    <div class="toolbar-separator" role="separator" aria-orientation="vertical"></div>
+    <div class="toolbar-group" role="group" aria-label="Lists">
+      <button data-action="ul" title="Unordered List" aria-label="Insert unordered list">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
       </button>
-      <button data-action="ol" title="Ordered List">
-        <svg viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="2" y="8" font-size="8">1</text><text x="2" y="14" font-size="8">2</text><text x="2" y="20" font-size="8">3</text></svg>
+      <button data-action="ol" title="Ordered List" aria-label="Insert ordered list">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="2" y="8" font-size="8">1</text><text x="2" y="14" font-size="8">2</text><text x="2" y="20" font-size="8">3</text></svg>
       </button>
-      <button data-action="checklist" title="Checklist">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="6" height="6" rx="1"/><polyline points="4.5 8 6 9.5 8.5 6.5"/><line x1="12" y1="8" x2="21" y2="8"/><rect x="3" y="14" width="6" height="6" rx="1"/><line x1="12" y1="17" x2="21" y2="17"/></svg>
+      <button data-action="checklist" title="Checklist" aria-label="Insert checklist">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="6" height="6" rx="1"/><polyline points="4.5 8 6 9.5 8.5 6.5"/><line x1="12" y1="8" x2="21" y2="8"/><rect x="3" y="14" width="6" height="6" rx="1"/><line x1="12" y1="17" x2="21" y2="17"/></svg>
       </button>
-      <button data-action="blockquote" title="Blockquote">
-        <svg viewBox="0 0 24 24"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+      <button data-action="blockquote" title="Blockquote" aria-label="Insert blockquote">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
       </button>
     </div>
     <div class="toolbar-spacer"></div>
-    <div class="toolbar-group">
-      <select id="font-select" title="Font">
+    <div class="toolbar-group" role="group" aria-label="Settings">
+      <select id="font-select" title="Font" aria-label="Font">
         <option value="default">Default font</option>
         <option value="opendyslexic">OpenDyslexic</option>
       </select>
-      <select id="theme-select" title="Theme">
+      <select id="theme-select" title="Theme" aria-label="Theme">
         <option value="github">GitHub</option>
         <option value="dark">Dark</option>
         <option value="foghorn">Foghorn</option>
@@ -84,74 +84,74 @@
         <option value="solarized-dark">Solarized Dark</option>
         <option value="solarized-light">Solarized Light</option>
       </select>
-      <button data-action="toggle-preview" title="Toggle Preview (Ctrl+Shift+P)">
-        <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <button data-action="toggle-preview" title="Toggle Preview (Ctrl+Shift+P)" aria-label="Toggle preview" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
-      <button data-action="toggle-layout" title="Toggle Layout">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+      <button data-action="toggle-layout" title="Toggle Layout" aria-label="Toggle layout" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
       </button>
-      <button data-action="custom-css" title="Custom CSS">
-        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      <button data-action="custom-css" title="Custom CSS" aria-label="Custom CSS">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       </button>
-      <button data-action="about" title="About &amp; credits">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <button data-action="about" title="About &amp; credits" aria-label="About and credits">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
       </button>
     </div>
-  </div>
+  </nav>
 
   <!-- Main content area -->
-  <div id="main" class="main horizontal">
+  <main id="main" class="main horizontal">
     <!-- Editor pane -->
-    <div id="editor-pane" class="pane editor-pane">
+    <div id="editor-pane" class="pane editor-pane" role="region" aria-label="Editor">
       <div id="editor"></div>
       <!-- Mascot overlay: sleepy when empty + no file, fades on first keystroke -->
-      <div id="editor-mascot" class="mascot-overlay"></div>
+      <div id="editor-mascot" class="mascot-overlay" aria-hidden="true"></div>
     </div>
 
     <!-- Resizer -->
-    <div id="resizer" class="resizer"></div>
+    <div id="resizer" class="resizer" role="separator" aria-label="Resize editor and preview" aria-orientation="vertical" tabindex="0"></div>
 
     <!-- Preview pane -->
-    <div id="preview-pane" class="pane preview-pane">
+    <div id="preview-pane" class="pane preview-pane" role="region" aria-label="Markdown preview">
       <div id="preview" class="markdown-preview"></div>
       <!-- Thinking corner: fades in when render takes >400ms, out when done -->
-      <div id="preview-mascot" class="mascot-corner"></div>
+      <div id="preview-mascot" class="mascot-corner" aria-hidden="true"></div>
     </div>
-  </div>
+  </main>
 
   <!-- Find bar -->
-  <div id="findbar" class="findbar hidden">
+  <div id="findbar" class="findbar hidden" role="search" aria-label="Find and replace" aria-hidden="true">
     <div class="findbar-row">
-      <input type="text" id="find-input" placeholder="Find..." spellcheck="false">
+      <input type="text" id="find-input" placeholder="Find..." spellcheck="false" aria-label="Find text">
       <label><input type="checkbox" id="find-regex"> Regex</label>
       <label><input type="checkbox" id="find-case"> Match Case</label>
       <label><input type="checkbox" id="find-whole"> Whole Word</label>
-      <span id="find-count" class="find-count"></span>
-      <button id="find-prev" title="Previous">&#9650;</button>
-      <button id="find-next" title="Next">&#9660;</button>
-      <button id="find-close" title="Close">&times;</button>
+      <span id="find-count" class="find-count" aria-live="polite" aria-atomic="true"></span>
+      <button id="find-prev" title="Previous" aria-label="Previous match">&#9650;</button>
+      <button id="find-next" title="Next" aria-label="Next match">&#9660;</button>
+      <button id="find-close" title="Close" aria-label="Close find bar">&times;</button>
     </div>
     <div class="findbar-row">
-      <input type="text" id="replace-input" placeholder="Replace..." spellcheck="false">
+      <input type="text" id="replace-input" placeholder="Replace..." spellcheck="false" aria-label="Replace text">
       <button id="replace-one">Replace</button>
       <button id="replace-all">Replace All</button>
     </div>
   </div>
 
   <!-- Status bar -->
-  <div id="statusbar" class="statusbar">
+  <footer id="statusbar" class="statusbar" aria-label="Document status">
     <span id="status-file">Untitled</span>
-    <span id="status-modified" class="hidden">*</span>
-    <span id="mascot-slot" class="mascot-slot"></span>
+    <span id="status-modified" class="hidden" aria-label="Unsaved changes">*</span>
+    <span id="mascot-slot" class="mascot-slot" aria-hidden="true"></span>
     <span class="statusbar-spacer"></span>
-    <span id="status-cursor">Ln 1, Col 1</span>
-    <span id="status-words">0 words</span>
-    <span id="status-chars">0 chars</span>
-  </div>
+    <span id="status-cursor" aria-label="Cursor position">Ln 1, Col 1</span>
+    <span id="status-words" aria-label="Word count">0 words</span>
+    <span id="status-chars" aria-label="Character count">0 chars</span>
+  </footer>
 
   <!-- Dialogs -->
-  <dialog id="link-dialog" class="app-dialog">
-    <h3>Insert Link</h3>
+  <dialog id="link-dialog" class="app-dialog" aria-labelledby="link-dialog-title">
+    <h3 id="link-dialog-title">Insert Link</h3>
     <label>URL<input type="text" id="link-url" placeholder="https://"></label>
     <label>Text<input type="text" id="link-text" placeholder="Link text"></label>
     <div class="dialog-buttons">
@@ -160,8 +160,8 @@
     </div>
   </dialog>
 
-  <dialog id="image-dialog" class="app-dialog">
-    <h3>Insert Image</h3>
+  <dialog id="image-dialog" class="app-dialog" aria-labelledby="image-dialog-title">
+    <h3 id="image-dialog-title">Insert Image</h3>
     <label>URL or path
       <div class="input-with-button">
         <input type="text" id="image-url" placeholder="https:// or local path">
@@ -177,8 +177,8 @@
     </div>
   </dialog>
 
-  <dialog id="table-dialog" class="app-dialog">
-    <h3>Insert Table</h3>
+  <dialog id="table-dialog" class="app-dialog" aria-labelledby="table-dialog-title">
+    <h3 id="table-dialog-title">Insert Table</h3>
     <label>Rows<input type="number" id="table-rows" value="3" min="1" max="50"></label>
     <label>Columns<input type="number" id="table-cols" value="3" min="1" max="20"></label>
     <div class="dialog-buttons">
@@ -187,8 +187,8 @@
     </div>
   </dialog>
 
-  <dialog id="custom-css-dialog" class="app-dialog custom-css-dialog">
-    <h3>Custom CSS</h3>
+  <dialog id="custom-css-dialog" class="app-dialog custom-css-dialog" aria-labelledby="custom-css-dialog-title">
+    <h3 id="custom-css-dialog-title">Custom CSS</h3>
     <p class="dialog-hint">Rules are applied to the preview pane only. Write selectors as if targeting the preview root (e.g. <code>h1 { color: red }</code>) — they will be automatically scoped.</p>
     <textarea id="custom-css-input" spellcheck="false" placeholder="/* h1 { color: crimson; }&#10;   blockquote { border-left: 4px solid #888; } */"></textarea>
     <div class="dialog-buttons">
@@ -197,11 +197,11 @@
     </div>
   </dialog>
 
-  <dialog id="about-dialog" class="app-dialog about-dialog">
+  <dialog id="about-dialog" class="app-dialog about-dialog" aria-labelledby="about-dialog-title">
     <div class="about-header">
-      <div id="about-mascot" class="about-mascot"></div>
+      <div id="about-mascot" class="about-mascot" aria-hidden="true"></div>
       <div>
-        <h3>MarkTheCrab</h3>
+        <h3 id="about-dialog-title">MarkTheCrab</h3>
         <p class="about-tag">a cheerful markdown editor · <em>snip snip!</em></p>
       </div>
     </div>
@@ -213,9 +213,9 @@
   </dialog>
 
   <!-- First-launch welcome (app.js un-hides when recent_files is empty) -->
-  <dialog id="welcome-dialog" class="app-dialog welcome-dialog">
-    <div id="welcome-mascot" class="welcome-mascot"></div>
-    <h3>Hi, I'm Mark!</h3>
+  <dialog id="welcome-dialog" class="app-dialog welcome-dialog" aria-labelledby="welcome-dialog-title">
+    <div id="welcome-mascot" class="welcome-mascot" aria-hidden="true"></div>
+    <h3 id="welcome-dialog-title">Hi, I'm Mark!</h3>
     <p class="welcome-tag"><em>snip snip!</em></p>
     <p>Press <kbd>Ctrl+O</kbd> to open a markdown file, or just start typing.</p>
     <div class="dialog-buttons">
