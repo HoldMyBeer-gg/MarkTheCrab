@@ -434,7 +434,7 @@ fn render_toc_nodes(nodes: &[TocNode], html: &mut String) {
     html.push_str("<ul>");
     for n in nodes {
         html.push_str("<li><a href=\"#");
-        html.push_str(&n.id);
+        html.push_str(&html_escape(&n.id));
         html.push_str("\">");
         html.push_str(&html_escape(&n.text));
         html.push_str("</a>");
@@ -556,7 +556,7 @@ fn process_highlight(line: &str) -> String {
             if let Some(end_pos) = search.find("==") {
                 result.push_str(&line[last_end..i]);
                 result.push_str("<mark>");
-                result.push_str(&search[..end_pos]);
+                result.push_str(&html_escape(&search[..end_pos]));
                 result.push_str("</mark>");
                 last_end = start + end_pos + 2;
                 // Advance chars past the closing ==
@@ -602,7 +602,7 @@ fn process_subscript(line: &str) -> String {
                     if !content.is_empty() && !content.contains(' ') {
                         result.push_str(&line[last_end..i]);
                         result.push_str("<sub>");
-                        result.push_str(content);
+                        result.push_str(&html_escape(content));
                         result.push_str("</sub>");
                         last_end = end + 1;
                         i = last_end;
@@ -627,7 +627,7 @@ fn replace_paired_marker(line: &str, marker: char, tag: &str) -> String {
             let content = &after_start[..end];
             if !content.is_empty() && !content.contains(' ') {
                 result.push_str(&rest[..start]);
-                result.push_str(&format!("<{tag}>{content}</{tag}>"));
+                result.push_str(&format!("<{tag}>{}</{tag}>", html_escape(content)));
                 rest = &after_start[end + marker.len_utf8()..];
                 continue;
             }
@@ -863,6 +863,47 @@ mod tests {
     fn test_xss_prevention() {
         let result = render_markdown("<script>alert('xss')</script>");
         assert!(!result.contains("<script>"));
+    }
+
+    #[test]
+    fn test_highlight_escapes_html() {
+        let result = render_markdown("==<script>alert(1)</script>==");
+        assert!(
+            !result.contains("<script>"),
+            "script must not survive: {result}"
+        );
+        assert!(
+            result.contains("&lt;script&gt;"),
+            "content should be escaped text: {result}"
+        );
+    }
+
+    #[test]
+    fn test_superscript_escapes_html() {
+        let result = render_markdown("x^<b>^");
+        assert!(
+            !result.contains("<b>"),
+            "raw tag must not survive: {result}"
+        );
+        assert!(result.contains("&lt;b&gt;"), "should be escaped: {result}");
+    }
+
+    #[test]
+    fn test_subscript_escapes_html() {
+        let result = render_markdown("H~<b>~O");
+        assert!(
+            !result.contains("<b>"),
+            "raw tag must not survive: {result}"
+        );
+    }
+
+    #[test]
+    fn test_toc_id_escaped_in_href() {
+        let result = render_markdown("[TOC]\n\n## Heading {#evil\">xss}");
+        assert!(
+            !result.contains("\">xss"),
+            "unescaped id must not appear in href: {result}"
+        );
     }
 
     #[test]
