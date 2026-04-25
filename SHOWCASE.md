@@ -1,21 +1,38 @@
-I used Remarkable for years. The features people kept asking for never landed, the repo went quiet, and I finally got tired of waiting. So I built a replacement: [MarkTheCrab](https://github.com/HoldMyBeer-gg/MarkTheCrab).
+# MarkTheCrab
 
-It's a cross-platform markdown editor built on Tauri + Rust + CodeMirror 6. The crab mascot is named Mark. He bounces when you click him.
+*Every feature Remarkable users asked for. Built in Rust.*
 
-Things it does that Remarkable never got around to:
+$$\begin{aligned}
+\nabla \cdot \mathbf{E} &= \frac{\rho}{\varepsilon_0} \\
+\nabla \cdot \mathbf{B} &= 0 \\
+\nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \\
+\nabla \times \mathbf{B} &= \mu_0\mathbf{J} + \mu_0\varepsilon_0\frac{\partial \mathbf{E}}{\partial t}
+\end{aligned}$$
 
-- KaTeX math inline and display ($E = mc^2$, $$...$$ and fenced blocks)
-- Mermaid diagrams in \`\`\`mermaid fences
-- Source-map-based scroll sync, not the crude viewport-ratio approach
-- PDF export via system print dialog, clean and chrome-free
-- 10 themes scoped to the preview pane only
-- Recent files, custom CSS, syntax highlighting for 24 languages
+<center>
+  <div style="text-align:center;margin:2rem 0">
+  <img src="src/assets/mascot/mascot.happy.svg" width="88" alt="Mark">
+  </div>
+</center>
 
+- [x] Live preview — rendered as you type, ~150 ms debounce
+- [x] Scroll sync — source-map based, not the crude top-to-bottom ratio
+- [x] KaTeX math — inline $E = mc^2$ and display blocks like above
+- [x] Mermaid diagrams — flowcharts, sequence, Gantt, and more
+- [x] Export to PDF — clean, chrome-free via system print dialog
+- [x] Recent files — last 10 files, one click away
+- [x] Custom CSS — scoped editor, saved with the document
+- [x] Syntax highlighting — 24 languages, loaded on demand
+- [x] Drag-and-drop images — auto-saved to `images/` beside your file
 
-MIT licensed. Quickstart is short if you already have Rust and Node:
-
-```bash
-git clone https://github.com/HoldMyBeer-gg/MarkTheCrab
-pnpm install && pnpm tauri dev
+```mermaid
+sequenceDiagram
+  participant You
+  participant Mark
+  participant Preview
+  You->>Mark: types markdown
+  Mark->>Preview: renders in ~150ms
+  Preview-->>You: live result
+  Note over Mark: scroll sync keeps you oriented
 ```
-Still early days but the core feature set is solid. Happy to answer questions via github issues!
+
