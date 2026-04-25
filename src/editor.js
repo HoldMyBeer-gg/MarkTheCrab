@@ -5,7 +5,7 @@ import { languages } from "@codemirror/language-data";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 
 // Override: the stock defaultHighlightStyle underlines anything tagged as a
@@ -51,7 +51,6 @@ export function createEditor(parent, { onChange, onCursorChange }) {
       drawSelection(),
       rectangularSelection(),
       crosshairCursor(),
-      indentOnInput(),
       bracketMatching(),
       highlightSelectionMatches(),
       wordWrapCompartment.of(EditorView.lineWrapping),
