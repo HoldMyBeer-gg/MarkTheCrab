@@ -7,8 +7,8 @@ mod settings;
 
 use commands::AppState;
 use settings::Settings;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, WindowEvent};
 
 fn main() {

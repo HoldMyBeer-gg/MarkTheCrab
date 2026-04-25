@@ -20,10 +20,7 @@ pub fn get_credits() -> String {
     // Third-party notices — bundled at compile time so there is nothing to
     // fetch or miss when shipped through the App Store or Play Store.
     let sections: &[(&str, &str)] = &[
-        (
-            "MarkTheCrab",
-            include_str!("../../LICENSE"),
-        ),
+        ("MarkTheCrab", include_str!("../../LICENSE")),
         (
             "Preview themes — derived from Remarkable by Jamie McGowan",
             include_str!("../third-party-licenses/Remarkable-MIT.txt"),
@@ -75,7 +72,7 @@ pub fn get_credits() -> String {
         out.push_str(&"=".repeat(72));
         out.push('\n');
         out.push_str(title);
-        out.push_str("\n");
+        out.push('\n');
         out.push_str(&"=".repeat(72));
         out.push_str("\n\n");
         out.push_str(body.trim_end());
@@ -104,7 +101,11 @@ pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<
         "theme" => settings.theme = value.to_string(),
         "custom_css" => settings.custom_css = value.to_string(),
         "font_family" => settings.font_family = value.to_string(),
-        "font_size" => settings.font_size = value.parse().map_err(|e: std::num::ParseIntError| e.to_string())?,
+        "font_size" => {
+            settings.font_size = value
+                .parse()
+                .map_err(|e: std::num::ParseIntError| e.to_string())?
+        }
         "line_numbers" => settings.line_numbers = value == "true",
         "word_wrap" => settings.word_wrap = value == "true",
         "live_preview" => settings.live_preview = value == "true",
@@ -112,7 +113,11 @@ pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<
         "show_toolbar" => settings.show_toolbar = value == "true",
         "show_statusbar" => settings.show_statusbar = value == "true",
         "vertical_layout" => settings.vertical_layout = value == "true",
-        "zoom_level" => settings.zoom_level = value.parse().map_err(|e: std::num::ParseFloatError| e.to_string())?,
+        "zoom_level" => {
+            settings.zoom_level = value
+                .parse()
+                .map_err(|e: std::num::ParseFloatError| e.to_string())?
+        }
         "rtl" => settings.rtl = value == "true",
         "spellcheck" => settings.spellcheck = value == "true",
         _ => return Err(format!("Unknown setting: {key}")),
