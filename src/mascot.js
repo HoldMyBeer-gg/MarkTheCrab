@@ -13,6 +13,10 @@
 // source SVGs, not the generated file.
 import { EXPRESSIONS } from "./mascot-expressions.js";
 
+// Helper-layer gate. App code keeps calling Mascot.show()/flash() unconditionally;
+// when `enabled` is false, those become no-ops and any already-mounted mascots
+// are torn down. When `animations` is false, breathe/blink defaults flip off.
+const config = { enabled: true, animations: true };
 
 // Inject shared keyframes once.
 function injectStyles() {
@@ -123,17 +127,33 @@ function startBlinkLoop() {
 
 export const Mascot = {
   /**
+   * Update gating flags from settings. Disabling tears down any
+   * already-rendered mascots so the call sites don't need to know.
+   */
+  configure(opts = {}) {
+    if (typeof opts.enabled === "boolean") config.enabled = opts.enabled;
+    if (typeof opts.animations === "boolean") config.animations = opts.animations;
+    if (!config.enabled) {
+      document.querySelectorAll(".mascot").forEach((el) => {
+        blinkers.delete(el);
+        el.parentNode && el.parentNode.removeChild(el);
+      });
+    }
+  },
+
+  /**
    * Mount/replace a mascot inside `target`.
    *   size:      px (required for non-flex containers)
    *   breathe:   true | false — slow breathing idle (default true)
    *   blink:     true | false — random blinks (default true)
    */
   show(target, expression, opts = {}) {
+    if (!config.enabled) return null;
     const host = resolveTarget(target);
     if (!host) return null;
     const size = opts.size ?? null;
-    const breathe = opts.breathe !== false;
-    const blink = opts.blink !== false;
+    const breathe = config.animations && opts.breathe !== false;
+    const blink = config.animations && opts.blink !== false;
 
     host.innerHTML = "";
     const el = buildMascot(expression, size);
@@ -172,6 +192,7 @@ export const Mascot = {
 
   /** One-shot celebration flash (e.g. save success). */
   flash(target, expression, duration = 1200, size = 48) {
+    if (!config.enabled) return;
     const host = resolveTarget(target);
     if (!host) return;
     const el = buildMascot(expression, size);
