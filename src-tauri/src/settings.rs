@@ -27,7 +27,9 @@ pub struct Settings {
     pub mascot_animations: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for Settings {
     fn default() -> Self {
