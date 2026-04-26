@@ -666,6 +666,112 @@ body.font-opendyslexic .cm-gutters {
   padding: 1px 6px;
 }
 
+/* Settings dialog — sections, rows, toggles. */
+.settings-dialog {
+  width: 480px;
+  max-width: 90vw;
+  min-width: 360px;
+}
+
+.settings-section {
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.settings-section.settings-section-last {
+  border-bottom: none;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.settings-row.settings-row-last {
+  margin-bottom: 0;
+}
+
+.settings-label-group { display: flex; flex-direction: column; }
+.settings-label { font-size: 13px; color: var(--text-primary); }
+.settings-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  font-style: normal;
+}
+
+.settings-select {
+  height: 30px;
+  padding: 0 8px;
+  min-width: 180px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+.settings-select:focus { border-color: var(--accent-color); }
+
+.settings-btn-link {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.settings-btn-link:hover { background: var(--bg-tertiary); }
+
+/* Toggle switch — Mark-orange when on, neutral when off. */
+.toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  border: none;
+  padding: 0;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.toggle .toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.toggle[aria-checked="true"] {
+  background: #F46623;
+}
+.toggle[aria-checked="true"] .toggle-thumb {
+  left: 18px;
+}
+.toggle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
 /* Inline error card (replaces silent mermaid/katex error tooltips) */
 .mascot-error-card {
   display: flex;

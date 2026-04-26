@@ -120,6 +120,8 @@ pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<
         }
         "rtl" => settings.rtl = value == "true",
         "spellcheck" => settings.spellcheck = value == "true",
+        "show_mascot" => settings.show_mascot = value == "true",
+        "mascot_animations" => settings.mascot_animations = value == "true",
         _ => return Err(format!("Unknown setting: {key}")),
     }
     settings.save()

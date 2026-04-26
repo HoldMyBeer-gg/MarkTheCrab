@@ -26,7 +26,6 @@ const mainEl = document.getElementById("main");
 const toolbarEl = document.getElementById("toolbar");
 const statusbarEl = document.getElementById("statusbar");
 const findbarEl = document.getElementById("findbar");
-const themeSelect = document.getElementById("theme-select");
 
 // Status bar elements
 const statusFile = document.getElementById("status-file");
@@ -169,13 +168,15 @@ function applySettings() {
     document.querySelector('[data-action="toggle-layout"]')?.setAttribute("aria-pressed", "true");
   }
 
-  themeSelect.value = settings.theme;
   applyTheme(settings.theme);
   applyCustomCss(settings.custom_css);
 
   applyFontFamily(settings.font_family);
-  const fontSelect = document.getElementById("font-select");
-  if (fontSelect) fontSelect.value = fontFamilyKey(settings.font_family);
+
+  Mascot.configure({
+    enabled: settings.show_mascot !== false,
+    animations: settings.mascot_animations !== false,
+  });
 
   if (settings.rtl) {
     previewEl.style.direction = "rtl";
@@ -842,7 +843,7 @@ function setupToolbar() {
     "toggle-preview": () => togglePreview(),
     "toggle-layout": toggleLayout,
     print: printPreview,
-    "custom-css": showCustomCss,
+    settings: showSettings,
     about: showAbout,
   };
 
@@ -852,24 +853,6 @@ function setupToolbar() {
     const action = actions[btn.dataset.action];
     if (action) action();
   });
-
-  themeSelect.addEventListener("change", (e) => {
-    settings.theme = e.target.value;
-    applyTheme(settings.theme);
-    invoke("update_setting", { key: "theme", value: settings.theme });
-    updatePreview(getContent(editor));
-  });
-
-  const fontSelect = document.getElementById("font-select");
-  if (fontSelect) {
-    fontSelect.addEventListener("change", (e) => {
-      const key = e.target.value;
-      const stored = key === "opendyslexic" ? "OpenDyslexic" : "";
-      settings.font_family = stored;
-      applyFontFamily(stored);
-      invoke("update_setting", { key: "font_family", value: stored });
-    });
-  }
 
   const recentSelect = document.getElementById("recent-select");
   if (recentSelect) {
@@ -1053,6 +1036,8 @@ function setupDialogs() {
   document.getElementById("about-close").onclick = () =>
     document.getElementById("about-dialog").close();
 
+  setupSettingsDialog();
+
   // Custom CSS dialog
   document.getElementById("custom-css-cancel").onclick = () =>
     document.getElementById("custom-css-dialog").close();
@@ -1078,6 +1063,95 @@ function applyCustomCss(css) {
   style.textContent = scoped;
   document.head.appendChild(style);
   customCssStyleEl = style;
+}
+
+// ────── Settings dialog ───────────────────────────────────────────
+function setupSettingsDialog() {
+  const dialog = document.getElementById("settings-dialog");
+  if (!dialog) return;
+
+  const themeSel = document.getElementById("settings-theme-select");
+  themeSel.addEventListener("change", (e) => {
+    settings.theme = e.target.value;
+    applyTheme(settings.theme);
+    invoke("update_setting", { key: "theme", value: settings.theme });
+    updatePreview(getContent(editor));
+  });
+
+  const fontSel = document.getElementById("settings-font-select");
+  fontSel.addEventListener("change", (e) => {
+    const key = e.target.value;
+    const stored = key === "opendyslexic" ? "OpenDyslexic" : "";
+    settings.font_family = stored;
+    applyFontFamily(stored);
+    invoke("update_setting", { key: "font_family", value: stored });
+  });
+
+  document.getElementById("settings-custom-css-open").onclick = () => {
+    dialog.close();
+    showCustomCss();
+  };
+
+  bindToggle("settings-word-wrap", "word_wrap", (on) => {
+    settings.word_wrap = on;
+    setWordWrap(editor, on);
+  });
+  bindToggle("settings-line-numbers", "line_numbers", (on) => {
+    settings.line_numbers = on;
+    setLineNumbers(editor, on);
+  });
+  bindToggle("settings-show-toolbar", "show_toolbar", (on) => {
+    settings.show_toolbar = on;
+    toolbarEl.classList.toggle("hidden", !on);
+  });
+  bindToggle("settings-show-mascot", "show_mascot", (on) => {
+    settings.show_mascot = on;
+    Mascot.configure({ enabled: on });
+    refreshEmptyMascot();
+  });
+  bindToggle("settings-mascot-animations", "mascot_animations", (on) => {
+    settings.mascot_animations = on;
+    Mascot.configure({ animations: on });
+  });
+
+  document.getElementById("settings-close").onclick = () => dialog.close();
+  document.getElementById("settings-done").onclick = () => dialog.close();
+}
+
+// Bind a button[role=switch] to a boolean setting. `apply` runs the
+// side-effect; the persisted value goes through update_setting.
+function bindToggle(elementId, settingKey, apply) {
+  const btn = document.getElementById(elementId);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const on = btn.getAttribute("aria-checked") !== "true";
+    btn.setAttribute("aria-checked", String(on));
+    apply(on);
+    invoke("update_setting", { key: settingKey, value: String(on) });
+  });
+}
+
+function syncSettingsDialog() {
+  const set = (id, on) => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute("aria-checked", String(!!on));
+  };
+  const sel = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+  };
+  sel("settings-theme-select", settings.theme || "github");
+  sel("settings-font-select", fontFamilyKey(settings.font_family));
+  set("settings-word-wrap", settings.word_wrap !== false);
+  set("settings-line-numbers", settings.line_numbers !== false);
+  set("settings-show-toolbar", settings.show_toolbar !== false);
+  set("settings-show-mascot", settings.show_mascot !== false);
+  set("settings-mascot-animations", settings.mascot_animations !== false);
+}
+
+function showSettings() {
+  syncSettingsDialog();
+  document.getElementById("settings-dialog").showModal();
 }
 
 function showCustomCss() {
