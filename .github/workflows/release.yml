@@ -7,10 +7,14 @@ on:
 
 jobs:
   release:
-    name: Build and release
-    runs-on: ubuntu-latest
+    name: Build and release (${{ matrix.os }})
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +40,8 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install Tauri system deps
+      - name: Install Tauri system deps (Linux only)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
