@@ -97,21 +97,21 @@ jobs:
 
   publish-release:
     name: Publish release
-    needs: build
+    needs: [create-release, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Flip draft to published
         uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         with:
           script: |
-            const tag = context.ref.replace('refs/tags/', '');
             const { owner, repo } = context.repo;
-            const { data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
             await github.rest.repos.updateRelease({
               owner,
               repo,
-              release_id: release.id,
+              release_id: Number(process.env.RELEASE_ID),
               draft: false,
             });
