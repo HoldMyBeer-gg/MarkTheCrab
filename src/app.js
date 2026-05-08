@@ -1472,5 +1472,21 @@ function setupClipboardPaste() {
   );
 })();
 
+// When the preview is copied, scrub the scroll-sync anchors out of the
+// HTML clipboard. Without this, every paste into a rich-text target
+// carries empty <a class="src-line" data-src-line="N"> debris that
+// looks like dangling references to line numbers in the source doc.
+previewPane.addEventListener("copy", (ev) => {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const frag = sel.getRangeAt(0).cloneContents();
+  const wrap = document.createElement("div");
+  wrap.appendChild(frag);
+  wrap.querySelectorAll("a.src-line").forEach((n) => n.remove());
+  ev.clipboardData.setData("text/html", wrap.innerHTML);
+  ev.clipboardData.setData("text/plain", wrap.innerText);
+  ev.preventDefault();
+});
+
 // Initialize
 init();

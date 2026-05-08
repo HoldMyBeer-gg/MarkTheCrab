@@ -262,7 +262,11 @@ html, body {
   100% { background-position: -200% 0; }
 }
 
-/* Scroll-sync anchors: zero-size invisible markers. */
+/* Scroll-sync anchors: zero-size invisible markers. Excluded from
+   selection so they don't leak into the clipboard when the preview is
+   copied. The copy handler in app.js scrubs them from the HTML
+   clipboard too, since user-select alone doesn't strip them from the
+   serialised HTML on every browser. */
 #preview a.src-line {
   display: block;
   width: 0;
@@ -270,6 +274,8 @@ html, body {
   overflow: hidden;
   color: transparent;
   pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* Find bar */
