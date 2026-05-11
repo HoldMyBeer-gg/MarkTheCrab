@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/markdown-core",
+    "crates/wasm-bindings",
+    "src-tauri",
+]
+
+# Aggressive size-optimised profile for the WASM bundle. Invoke with
+# `wasm-pack build --profiling` or `cargo build --profile wasm-release`.
+[profile.wasm-release]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+

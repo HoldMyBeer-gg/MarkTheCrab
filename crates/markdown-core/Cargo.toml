@@ -1,0 +1,15 @@
+[package]
+name = "markdown-core"
+version = "0.1.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "MarkTheCrab markdown renderer, HTML export, and bundled credits. Pure Rust, no host I/O."
+
+[features]
+default = []
+simd = ["pulldown-cmark/simd"]
+
+[dependencies]
+pulldown-cmark = "0.12"
+ammonia = "4"
+regex-lite = "0.1"

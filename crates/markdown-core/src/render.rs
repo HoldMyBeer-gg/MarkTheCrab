@@ -32,6 +32,13 @@ pub fn render_markdown(input: &str) -> String {
     // Restore code so pulldown-cmark parses it as real code blocks/spans
     let with_code = restore_sentinels(&processed, &code_sidebar, CODE_OPEN, CODE_CLOSE);
 
+    // Make indented numeric markers nest the way users expect. Strict
+    // CommonMark says an indented `3. foo` after `2. bar` stays as text
+    // because only marker `1` can interrupt the parent's paragraph.
+    // Rewrite the marker to `1.` so pulldown-cmark nests it; the CSS
+    // counter on `#preview ol` produces the visible `2.1`-style number.
+    let with_code = relax_indented_ol_markers(&with_code);
+
     let line_starts = compute_line_starts(&with_code);
 
     let mut options = Options::empty();
@@ -131,6 +138,51 @@ fn mask_code(input: &str, sidebar: &mut Vec<String>) -> String {
         s
     })
     .into_owned()
+}
+
+// Rewrite indented numeric list markers to `1.` so they nest under the
+// parent list item. CommonMark forbids markers other than `1` from
+// interrupting a paragraph, which is exactly what an indented `3. foo`
+// following `2. bar` tries to do — so without this rewrite, the line
+// gets eaten as continuation text. Only touches lines with 3+ spaces of
+// indent and a numeric marker that the previous non-blank line was
+// itself a list item, so plain prose paragraphs starting "42. The…"
+// are left alone.
+fn relax_indented_ol_markers(input: &str) -> String {
+    let item_re = regex_lite::Regex::new(r"^( *)(?:\d+[.)]|[-*+])\s").unwrap();
+    let indented_num_re = regex_lite::Regex::new(r"^( {3,})(\d+)([.)]\s)").unwrap();
+    let mut out = String::with_capacity(input.len());
+    let mut prev_was_list_or_continuation = false;
+    let mut prev_indent = 0usize;
+    for (i, line) in input.lines().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        if line.trim().is_empty() {
+            out.push_str(line);
+            prev_was_list_or_continuation = false;
+            continue;
+        }
+        if let Some(c) = indented_num_re.captures(line)
+            && prev_was_list_or_continuation
+            && c[1].len() > prev_indent
+            && c[2] != *"1"
+        {
+            out.push_str(&c[1]);
+            out.push('1');
+            out.push_str(&c[3]);
+            out.push_str(&line[c.get(0).unwrap().end()..]);
+            prev_was_list_or_continuation = true;
+            prev_indent = c[1].len();
+            continue;
+        }
+        out.push_str(line);
+        if let Some(c) = item_re.captures(line) {
+            prev_was_list_or_continuation = true;
+            prev_indent = c[1].len();
+        }
+    }
+    out
 }
 
 fn pandoc_delims_to_dollars(input: &str) -> String {

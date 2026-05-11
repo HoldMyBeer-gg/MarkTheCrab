@@ -1,0 +1,13 @@
+[package]
+name = "markthecrab-wasm"
+version = "0.1.1"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Browser bindings for MarkTheCrab's markdown renderer."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+markdown-core = { path = "../markdown-core" }
+wasm-bindgen = "0.2"

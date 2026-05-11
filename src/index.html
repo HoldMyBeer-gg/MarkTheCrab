@@ -9,6 +9,13 @@
   <link rel="stylesheet" href="styles/toolbar.css">
 </head>
 <body>
+  <!-- Demo-only notice; CSS hides it under Tauri -->
+  <div class="demo-banner" role="status">
+    <span>You're viewing the in-browser WASM demo. File open and save work via the browser File System API; saved files are real files on your disk.</span>
+    <a href="https://github.com/HoldMyBeer-gg/MarkTheCrab" target="_blank" rel="noopener">Get the desktop app</a>
+    <button type="button" class="demo-banner-close" aria-label="Dismiss" data-action="dismiss-demo-banner">×</button>
+  </div>
+
   <!-- Toolbar -->
   <div id="toolbar" class="toolbar" role="navigation" aria-label="Toolbar">
     <div class="toolbar-group" role="group" aria-label="File">
