@@ -1852,13 +1852,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
-name = "markthecrab"
+name = "markdown-core"
 version = "0.1.1"
 dependencies = [
  "ammonia",
- "dirs",
  "pulldown-cmark",
  "regex-lite",
+]
+
+[[package]]
+name = "markthecrab"
+version = "0.1.1"
+dependencies = [
+ "dirs",
+ "markdown-core",
  "serde",
  "serde_json",
  "tauri",
@@ -1867,6 +1874,14 @@ dependencies = [
  "tauri-plugin-fs",
  "tauri-plugin-shell",
  "toml 0.8.2",
+]
+
+[[package]]
+name = "markthecrab-wasm"
+version = "0.1.1"
+dependencies = [
+ "markdown-core",
+ "wasm-bindgen",
 ]
 
 [[package]]

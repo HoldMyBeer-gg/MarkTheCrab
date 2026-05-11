@@ -1,4 +1,3 @@
-use crate::markdown;
 use crate::settings::Settings;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -12,73 +11,12 @@ pub struct AppState {
 
 #[tauri::command]
 pub fn render_markdown(text: &str) -> String {
-    markdown::render_markdown(text)
+    markdown_core::render_markdown(text)
 }
 
 #[tauri::command]
 pub fn get_credits() -> String {
-    // Third-party notices — bundled at compile time so there is nothing to
-    // fetch or miss when shipped through the App Store or Play Store.
-    let sections: &[(&str, &str)] = &[
-        ("MarkTheCrab", include_str!("../../LICENSE")),
-        (
-            "Preview themes — derived from Remarkable by Jamie McGowan",
-            include_str!("../third-party-licenses/Remarkable-MIT.txt"),
-        ),
-        (
-            "OpenDyslexic font — Abbie Gonzalez (SIL Open Font License 1.1)",
-            include_str!("../third-party-licenses/OpenDyslexic-OFL.txt"),
-        ),
-        (
-            "CodeMirror — MIT",
-            include_str!("../third-party-licenses/CodeMirror-MIT.txt"),
-        ),
-        (
-            "highlight.js — BSD-3-Clause",
-            include_str!("../third-party-licenses/highlight.js-BSD3.txt"),
-        ),
-        (
-            "KaTeX — MIT",
-            include_str!("../third-party-licenses/KaTeX-MIT.txt"),
-        ),
-        (
-            "Mermaid — MIT",
-            include_str!("../third-party-licenses/Mermaid-MIT.txt"),
-        ),
-        (
-            "pulldown-cmark — MIT",
-            include_str!("../third-party-licenses/pulldown-cmark.txt"),
-        ),
-        (
-            "ammonia — MIT (dual-licensed with Apache-2.0)",
-            include_str!("../third-party-licenses/ammonia-MIT.txt"),
-        ),
-        (
-            "regex-lite — MIT (dual-licensed with Apache-2.0)",
-            include_str!("../third-party-licenses/regex-lite-MIT.txt"),
-        ),
-        (
-            "Tauri — MIT (dual-licensed with Apache-2.0)",
-            include_str!("../third-party-licenses/Tauri-MIT.txt"),
-        ),
-    ];
-
-    let mut out = String::new();
-    out.push_str("MarkTheCrab\n");
-    out.push_str(&format!("Version {}\n\n", env!("CARGO_PKG_VERSION")));
-    out.push_str("This software bundles work from the projects listed below. ");
-    out.push_str("Each section reproduces the upstream license verbatim.\n\n");
-    for (title, body) in sections {
-        out.push_str(&"=".repeat(72));
-        out.push('\n');
-        out.push_str(title);
-        out.push('\n');
-        out.push_str(&"=".repeat(72));
-        out.push_str("\n\n");
-        out.push_str(body.trim_end());
-        out.push_str("\n\n");
-    }
-    out
+    markdown_core::credits()
 }
 
 #[tauri::command]
@@ -205,51 +143,7 @@ pub fn get_current_file(state: State<AppState>) -> Option<String> {
 
 #[tauri::command]
 pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &str) -> String {
-    let body = markdown::render_markdown(markdown_text);
-    if styled {
-        // Rewrite the Remarkable-derived preview selector to our neutral one so
-        // the exported HTML doesn't leak upstream branding while still matching
-        // the body class below.
-        let css = get_theme_css(theme).replace(".remarkable-preview", ".markdown-preview");
-        format!(
-            r#"<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>MarkTheCrab Export</title>
-<style>{css}</style>
-{extra_css}
-</head>
-<body class="markdown-preview">
-{body}
-</body>
-</html>"#,
-            css = css,
-            extra_css = if custom_css.is_empty() {
-                String::new()
-            } else {
-                // The HTML RAWTEXT parser closes <style> on "</style", so
-                // escape "</" → "<\/" which the parser rejects as an invalid
-                // tag-name start and treats as literal text. CSS sees "\/" as
-                // just "/" (backslash-escape of a non-special char is a no-op).
-                let safe = custom_css.replace("</", "<\\/");
-                format!("<style>{safe}</style>")
-            },
-        )
-    } else {
-        format!(
-            r#"<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>MarkTheCrab Export</title>
-</head>
-<body>
-{body}
-</body>
-</html>"#,
-        )
-    }
+    markdown_core::export_html(markdown_text, styled, theme, custom_css)
 }
 
 /// Save image bytes to an `images/` directory next to the current markdown file.
@@ -299,20 +193,4 @@ pub fn save_image(
     // Return relative path from the markdown file's directory
     let relative = format!("images/{}", dest.file_name().unwrap().to_string_lossy());
     Ok(relative)
-}
-
-fn get_theme_css(theme: &str) -> &'static str {
-    match theme {
-        "dark" => include_str!("../../src/themes/dark.css"),
-        "foghorn" => include_str!("../../src/themes/foghorn.css"),
-        "github" => include_str!("../../src/themes/github.css"),
-        "handwriting" => include_str!("../../src/themes/handwriting.css"),
-        "markdown" => include_str!("../../src/themes/markdown.css"),
-        "metro-vibes" => include_str!("../../src/themes/metro-vibes.css"),
-        "metro-vibes-dark" => include_str!("../../src/themes/metro-vibes-dark.css"),
-        "modern" => include_str!("../../src/themes/modern.css"),
-        "solarized-dark" => include_str!("../../src/themes/solarized-dark.css"),
-        "solarized-light" => include_str!("../../src/themes/solarized-light.css"),
-        _ => include_str!("../../src/themes/github.css"),
-    }
 }

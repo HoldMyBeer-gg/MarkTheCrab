@@ -5,9 +5,8 @@ import { Mascot } from "./mascot.js";
 // Make hljs available globally for preview highlighting
 window.hljs = hljs;
 
-const { invoke, convertFileSrc } = window.__TAURI__.core;
-const { open, save, message, ask } = window.__TAURI__.dialog;
-const tauriEvent = window.__TAURI__.event;
+import { invoke, convertFileSrc, dialog, event as tauriEvent, isBrowser } from "./runtime.js";
+const { open, save, message, ask } = dialog;
 
 // State
 let editor;
