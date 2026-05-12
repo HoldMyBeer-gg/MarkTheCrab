@@ -1853,7 +1853,7 @@ checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "markdown-core"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "ammonia",
  "pulldown-cmark",
@@ -1862,7 +1862,7 @@ dependencies = [
 
 [[package]]
 name = "markthecrab"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "dirs",
  "markdown-core",
@@ -1878,7 +1878,7 @@ dependencies = [
 
 [[package]]
 name = "markthecrab-wasm"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "markdown-core",
  "wasm-bindgen",
