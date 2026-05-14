@@ -1,5 +1,7 @@
 use crate::commands::AppState;
-use tauri::menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder};
+use tauri::menu::{
+    Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
