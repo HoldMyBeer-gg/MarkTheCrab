@@ -111,25 +111,6 @@
     </div>
   </div>
 
-  <!-- Find bar -->
-  <div id="findbar" class="findbar hidden" role="search" aria-label="Find and replace" aria-hidden="true">
-    <div class="findbar-row">
-      <input type="text" id="find-input" placeholder="Find..." spellcheck="false" aria-label="Find text">
-      <label><input type="checkbox" id="find-regex"> Regex</label>
-      <label><input type="checkbox" id="find-case"> Match Case</label>
-      <label><input type="checkbox" id="find-whole"> Whole Word</label>
-      <span id="find-count" class="find-count" aria-live="polite" aria-atomic="true"></span>
-      <button id="find-prev" title="Previous" aria-label="Previous match">&#9650;</button>
-      <button id="find-next" title="Next" aria-label="Next match">&#9660;</button>
-      <button id="find-close" title="Close" aria-label="Close find bar">&times;</button>
-    </div>
-    <div class="findbar-row">
-      <input type="text" id="replace-input" placeholder="Replace..." spellcheck="false" aria-label="Replace text">
-      <button id="replace-one">Replace</button>
-      <button id="replace-all">Replace All</button>
-    </div>
-  </div>
-
   <!-- Status bar -->
   <div id="statusbar" class="statusbar" role="contentinfo" aria-label="Document status">
     <span id="status-file">Untitled</span>
@@ -241,9 +222,16 @@
         <div class="settings-label">Line numbers</div>
         <button type="button" id="settings-line-numbers" class="toggle" role="switch" aria-checked="true" aria-label="Line numbers"><span class="toggle-thumb"></span></button>
       </div>
-      <div class="settings-row settings-row-last">
+      <div class="settings-row">
         <div class="settings-label">Show toolbar</div>
         <button type="button" id="settings-show-toolbar" class="toggle" role="switch" aria-checked="true" aria-label="Show toolbar"><span class="toggle-thumb"></span></button>
+      </div>
+      <div class="settings-row settings-row-last">
+        <div class="settings-label-group">
+          <div class="settings-label">Spell check</div>
+          <div class="settings-hint">Underline misspellings in the editor</div>
+        </div>
+        <button type="button" id="settings-spellcheck" class="toggle" role="switch" aria-checked="true" aria-label="Spell check"><span class="toggle-thumb"></span></button>
       </div>
     </section>
 
