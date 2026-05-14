@@ -1,4 +1,4 @@
-import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount } from "./editor.js";
+import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
 import hljs from "./hljs-setup.js";
 import { Mascot } from "./mascot.js";
 
@@ -24,7 +24,6 @@ const editorPane = document.getElementById("editor-pane");
 const mainEl = document.getElementById("main");
 const toolbarEl = document.getElementById("toolbar");
 const statusbarEl = document.getElementById("statusbar");
-const findbarEl = document.getElementById("findbar");
 
 // Status bar elements
 const statusFile = document.getElementById("status-file");
@@ -62,9 +61,6 @@ async function init() {
   // Set up dialogs
   setupDialogs();
 
-  // Set up findbar
-  setupFindbar();
-
   // Set up drag-drop
   setupDragDrop();
 
@@ -73,6 +69,9 @@ async function init() {
 
   // Guard window close against unsaved changes
   setupCloseGuard();
+
+  // Native menu wiring (Tauri only)
+  setupMenuEvents();
 
   // Populate recent-files dropdown from settings
   refreshRecentFiles();
@@ -127,6 +126,67 @@ async function maybeShowWelcome() {
     if (go) go.onclick = () => dialog.close();
   } catch (_) {
     /* ignore */
+  }
+}
+
+async function setupMenuEvents() {
+  if (!tauriEvent || isBrowser) return;
+  await tauriEvent.listen("mtc:menu", async (e) => {
+    const id = typeof e.payload === "string" ? e.payload : "";
+    await dispatchMenu(id);
+  });
+  await tauriEvent.listen("mtc:menu:open-recent", async (e) => {
+    const path = typeof e.payload === "string" ? e.payload : null;
+    if (path) await openRecent(path);
+  });
+}
+
+async function dispatchMenu(id) {
+  switch (id) {
+    case "file.new": return newFile();
+    case "file.open": return openFile();
+    case "file.save": return saveFile();
+    case "file.save_as": return saveFileAs();
+    case "file.export_styled": return exportHtml(true);
+    case "file.export_raw": return exportHtml(false);
+    case "file.print": return printPreview();
+    case "file.recent.cleared": return refreshRecentFiles();
+
+    case "edit.undo": editorUndo(editor); return;
+    case "edit.redo": editorRedo(editor); return;
+    case "edit.find": return openFind(editor);
+
+    case "insert.bold": return wrapSelection(editor, "**");
+    case "insert.italic": return wrapSelection(editor, "*");
+    case "insert.strike": return wrapSelection(editor, "~~");
+    case "insert.h1": return insertAtLineStart(editor, "# ");
+    case "insert.h2": return insertAtLineStart(editor, "## ");
+    case "insert.h3": return insertAtLineStart(editor, "### ");
+    case "insert.h4": return insertAtLineStart(editor, "#### ");
+    case "insert.link": {
+      const sel = editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to);
+      if (sel) document.getElementById("link-text").value = sel;
+      document.getElementById("link-dialog").showModal();
+      document.getElementById("link-url").focus();
+      return;
+    }
+    case "insert.image": document.getElementById("image-dialog").showModal(); return;
+    case "insert.table": document.getElementById("table-dialog").showModal(); return;
+    case "insert.hr": return insertAtCursor(editor, "\n\n---\n\n");
+    case "insert.code": return wrapSelection(editor, "```\n", "\n```");
+    case "insert.ul": return insertAtLineStart(editor, "- ");
+    case "insert.ol": return insertAtLineStart(editor, "1. ");
+    case "insert.checklist": return insertAtLineStart(editor, "- [ ] ");
+    case "insert.quote": return insertAtLineStart(editor, "> ");
+
+    case "view.toggle_preview": return togglePreview();
+    case "view.toggle_layout": return toggleLayout();
+    case "view.zoom_in": return zoomPreview(0.1);
+    case "view.zoom_out": return zoomPreview(-0.1);
+    case "view.zoom_reset": return zoomPreview(0);
+    case "view.settings": return showSettings();
+
+    case "help.about": return showAbout();
   }
 }
 
@@ -685,6 +745,10 @@ async function refreshRecentFiles() {
   }
   select.disabled = list.length === 0;
   select.value = "";
+
+  if (!isBrowser) {
+    try { await invoke("refresh_recent_menu"); } catch (_) { /* desktop-only */ }
+  }
 }
 
 async function openRecent(path) {
@@ -880,8 +944,9 @@ function setupShortcuts() {
         case "d": e.preventDefault(); wrapSelection(editor, "~~"); break;
         case "l": e.preventDefault(); { const sel = editor.state.sliceDoc(editor.state.selection.main.from, editor.state.selection.main.to); if (sel) document.getElementById("link-text").value = sel; document.getElementById("link-dialog").showModal(); document.getElementById("link-url").focus(); } break;
         case "h": e.preventDefault(); insertAtCursor(editor, "\n\n---\n\n"); break;
-        case "f": e.preventDefault(); toggleFindbar(); break;
+        case "f": e.preventDefault(); openFind(editor); break;
         case "e": e.preventDefault(); exportHtml(true); break;
+        case ",": e.preventDefault(); showSettings(); break;
         case "1": e.preventDefault(); insertAtLineStart(editor, "# "); break;
         case "2": e.preventDefault(); insertAtLineStart(editor, "## "); break;
         case "3": e.preventDefault(); insertAtLineStart(editor, "### "); break;
@@ -906,10 +971,6 @@ function setupShortcuts() {
       // Tauri handles fullscreen via window API if needed
     }
 
-    if (e.key === "Escape") {
-      findbarEl.classList.add("hidden");
-      findbarEl.setAttribute("aria-hidden", "true");
-    }
   });
 }
 
@@ -1103,6 +1164,10 @@ function setupSettingsDialog() {
     settings.show_toolbar = on;
     toolbarEl.classList.toggle("hidden", !on);
   });
+  bindToggle("settings-spellcheck", "spellcheck", (on) => {
+    settings.spellcheck = on;
+    setSpellcheck(editor, on);
+  });
   bindToggle("settings-show-mascot", "show_mascot", (on) => {
     settings.show_mascot = on;
     Mascot.configure({ enabled: on });
@@ -1144,6 +1209,7 @@ function syncSettingsDialog() {
   set("settings-word-wrap", settings.word_wrap !== false);
   set("settings-line-numbers", settings.line_numbers !== false);
   set("settings-show-toolbar", settings.show_toolbar !== false);
+  set("settings-spellcheck", settings.spellcheck !== false);
   set("settings-show-mascot", settings.show_mascot !== false);
   set("settings-mascot-animations", settings.mascot_animations !== false);
 }
@@ -1175,97 +1241,6 @@ async function showAbout() {
   textarea.value = creditsCache;
   dialog.showModal();
   textarea.scrollTop = 0;
-}
-
-// Find bar
-function toggleFindbar() {
-  findbarEl.classList.toggle("hidden");
-  const visible = !findbarEl.classList.contains("hidden");
-  findbarEl.setAttribute("aria-hidden", String(!visible));
-  if (visible) {
-    document.getElementById("find-input").focus();
-  }
-}
-
-function setupFindbar() {
-  document.getElementById("find-close").onclick = () => {
-    findbarEl.classList.add("hidden");
-    findbarEl.setAttribute("aria-hidden", "true");
-  };
-
-  // Basic find implementation using CodeMirror search
-  // The actual search is handled by CodeMirror's built-in search via Ctrl+F
-  // This findbar provides a custom UI for it
-  const findInput = document.getElementById("find-input");
-  const replaceInput = document.getElementById("replace-input");
-
-  findInput.addEventListener("input", () => doFind());
-  document.getElementById("find-next").onclick = () => doFind("next");
-  document.getElementById("find-prev").onclick = () => doFind("prev");
-  document.getElementById("find-regex").onchange = () => doFind();
-  document.getElementById("find-case").onchange = () => doFind();
-  document.getElementById("find-whole").onchange = () => doFind();
-
-  document.getElementById("replace-one").onclick = () => doReplace(false);
-  document.getElementById("replace-all").onclick = () => doReplace(true);
-}
-
-function doFind(direction) {
-  const query = document.getElementById("find-input").value;
-  if (!query) {
-    document.getElementById("find-count").textContent = "";
-    return;
-  }
-
-  const isRegex = document.getElementById("find-regex").checked;
-  const caseSensitive = document.getElementById("find-case").checked;
-  const wholeWord = document.getElementById("find-whole").checked;
-
-  const content = getContent(editor);
-  let pattern;
-  try {
-    let src = isRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (wholeWord) src = `\\b${src}\\b`;
-    pattern = new RegExp(src, caseSensitive ? "g" : "gi");
-  } catch {
-    document.getElementById("find-count").textContent = "Invalid regex";
-    return;
-  }
-
-  // Avoid UI freeze from catastrophic backtracking on huge documents.
-  if (isRegex && content.length > 500_000) {
-    document.getElementById("find-count").textContent = "Doc too large for realtime regex";
-    return;
-  }
-
-  const matches = [...content.matchAll(pattern)];
-  document.getElementById("find-count").textContent =
-    matches.length > 0 ? `${matches.length} matches` : "No matches";
-}
-
-function doReplace(all) {
-  const query = document.getElementById("find-input").value;
-  const replacement = document.getElementById("replace-input").value;
-  if (!query) return;
-
-  const isRegex = document.getElementById("find-regex").checked;
-  const caseSensitive = document.getElementById("find-case").checked;
-  const wholeWord = document.getElementById("find-whole").checked;
-
-  let content = getContent(editor);
-  let src = isRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (wholeWord) src = `\\b${src}\\b`;
-
-  try {
-    const flags = (caseSensitive ? "" : "i") + (all ? "g" : "");
-    const pattern = new RegExp(src, flags);
-    const newContent = content.replace(pattern, replacement);
-    if (newContent !== content) {
-      setContent(editor, newContent);
-    }
-  } catch {
-    // Invalid regex, ignore
-  }
 }
 
 // Image helpers

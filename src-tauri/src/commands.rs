@@ -1,8 +1,9 @@
+use crate::menu;
 use crate::settings::Settings;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
@@ -123,6 +124,11 @@ pub fn stat_mtime(path: &str) -> Result<Option<u64>, String> {
 #[tauri::command]
 pub fn confirm_close(window: tauri::Window) {
     let _ = window.destroy();
+}
+
+#[tauri::command]
+pub fn refresh_recent_menu(app: AppHandle) -> Result<(), String> {
+    menu::refresh(&app).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

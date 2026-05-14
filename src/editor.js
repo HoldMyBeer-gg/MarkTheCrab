@@ -2,11 +2,12 @@ import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightAc
 import { EditorState, Compartment } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+import { defaultKeymap, history, historyKeymap, indentWithTab, undo, redo } from "@codemirror/commands";
+import { searchKeymap, highlightSelectionMatches, openSearchPanel } from "@codemirror/search";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
+import { spellcheckExtension } from "./spellcheck.js";
 
 // Override: the stock defaultHighlightStyle underlines anything tagged as a
 // heading, and lezer-markdown also tags table-header cells as headings —
@@ -23,9 +24,6 @@ const fontFamilyCompartment = new Compartment();
 const spellcheckCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 
-const spellcheckAttr = (enabled) =>
-  EditorView.contentAttributes.of({ spellcheck: enabled ? "true" : "false" });
-
 const fontSizeTheme = (size) =>
   EditorView.theme({
     ".cm-content": { fontSize: `${size}px` },
@@ -37,6 +35,11 @@ const fontFamilyTheme = (family) =>
     ".cm-content": { fontFamily: family || "" },
     ".cm-gutters": { fontFamily: family || "" },
   });
+
+// Disable the native browser spellchecker. We do our own via a CodeMirror
+// linter (see spellcheck.js) because WKWebView's contenteditable check is
+// unreliable for programmatically inserted content (file loads, paste).
+const nativeSpellcheckOff = EditorView.contentAttributes.of({ spellcheck: "false" });
 
 export function createEditor(parent, { onChange, onCursorChange }) {
   const state = EditorState.create({
@@ -56,7 +59,8 @@ export function createEditor(parent, { onChange, onCursorChange }) {
       wordWrapCompartment.of(EditorView.lineWrapping),
       fontSizeCompartment.of(fontSizeTheme(14)),
       fontFamilyCompartment.of(fontFamilyTheme("")),
-      spellcheckCompartment.of(spellcheckAttr(true)),
+      nativeSpellcheckOff,
+      spellcheckCompartment.of(spellcheckExtension()),
       themeCompartment.of([
         syntaxHighlighting(mtcHighlightOverrides),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
@@ -140,7 +144,9 @@ export function setFontFamily(view, family) {
 
 export function setSpellcheck(view, enabled) {
   view.dispatch({
-    effects: spellcheckCompartment.reconfigure(spellcheckAttr(enabled)),
+    effects: spellcheckCompartment.reconfigure(
+      enabled ? spellcheckExtension() : []
+    ),
   });
 }
 
@@ -174,6 +180,21 @@ export function insertAtLineStart(view, prefix) {
     changes: { from: line.from, to: line.from, insert: prefix },
   });
   view.focus();
+}
+
+export function editorUndo(view) {
+  undo(view);
+  view.focus();
+}
+
+export function editorRedo(view) {
+  redo(view);
+  view.focus();
+}
+
+export function openFind(view) {
+  view.focus();
+  openSearchPanel(view);
 }
 
 export function getWordCount(view) {

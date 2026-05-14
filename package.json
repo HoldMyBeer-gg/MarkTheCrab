@@ -1,15 +1,15 @@
 {
   "name": "markthecrab",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
     "build:mascot": "node scripts/build-mascot.mjs",
     "build:wasm": "node scripts/build-wasm.mjs",
-    "build:web": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting --external:./wasm/pkg/* && node scripts/copy-vendor.js",
+    "build:web": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting --external:./wasm/pkg/* --loader:.aff=text --loader:.dic=text && node scripts/copy-vendor.js",
     "build": "npm run build:web",
     "build:demo": "npm run build:wasm && npm run build:web",
-    "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/*",
+    "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/* --loader:.aff=text --loader:.dic=text",
     "tauri": "tauri"
   },
   "devDependencies": {
@@ -28,9 +28,11 @@
     "@codemirror/view": "^6.41.1",
     "@tauri-apps/api": "^2.10.1",
     "codemirror": "^6.0.2",
+    "dictionary-en-us": "^2.2.1",
     "esbuild": "^0.28.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
-    "mermaid": "^11.14.0"
+    "mermaid": "^11.14.0",
+    "nspell": "^2.1.5"
   }
 }

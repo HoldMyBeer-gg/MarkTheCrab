@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod menu;
 mod settings;
 
 use commands::AppState;
@@ -37,7 +38,16 @@ fn main() {
             commands::write_file_with_mtime,
             commands::get_credits,
             commands::confirm_close,
+            commands::refresh_recent_menu,
         ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            menu::install(&handle)?;
+            app.on_menu_event(move |app, event| {
+                menu::handle_event(app, event.id().as_ref());
+            });
+            Ok(())
+        })
         .on_window_event(|window, event| {
             // Intercept close; let the frontend decide whether to proceed
             // based on unsaved state. The frontend calls `confirm_close`
