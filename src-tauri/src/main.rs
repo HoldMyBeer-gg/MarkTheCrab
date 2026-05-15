@@ -38,6 +38,7 @@ fn main() {
             commands::write_file_with_mtime,
             commands::get_credits,
             commands::confirm_close,
+            commands::quit_app,
             commands::refresh_recent_menu,
         ])
         .setup(|app| {

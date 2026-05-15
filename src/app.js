@@ -187,19 +187,28 @@ async function dispatchMenu(id) {
     case "view.settings": return showSettings();
 
     case "help.about": return showAbout();
+
+    case "app.quit": return quitApp();
   }
+}
+
+async function confirmDiscardUnsaved() {
+  if (!isModified) return true;
+  return await ask(
+    "You have unsaved changes. Close without saving?",
+    { title: "Unsaved changes", kind: "warning", okLabel: "Discard", cancelLabel: "Keep editing" }
+  );
+}
+
+async function quitApp() {
+  if (!(await confirmDiscardUnsaved())) return;
+  await invoke("quit_app");
 }
 
 async function setupCloseGuard() {
   if (!tauriEvent) return;
   await tauriEvent.listen("mtc:close-requested", async () => {
-    if (isModified) {
-      const discard = await ask(
-        "You have unsaved changes. Close without saving?",
-        { title: "Unsaved changes", kind: "warning", okLabel: "Discard", cancelLabel: "Keep editing" }
-      );
-      if (!discard) return;
-    }
+    if (!(await confirmDiscardUnsaved())) return;
     await invoke("confirm_close");
   });
 }

@@ -34,7 +34,11 @@ fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             .item(&PredefinedMenuItem::hide_others(app, None)?)
             .item(&PredefinedMenuItem::show_all(app, None)?)
             .separator()
-            .item(&PredefinedMenuItem::quit(app, None)?)
+            .item(
+                &MenuItemBuilder::with_id("app.quit", "Quit MarkTheCrab")
+                    .accelerator("Cmd+Q")
+                    .build(app)?,
+            )
             .build()?;
         b = b.item(&app_menu);
     }
@@ -87,9 +91,11 @@ fn file_menu<R: Runtime>(app: &AppHandle<R>, recents: &[String]) -> tauri::Resul
 
     #[cfg(not(target_os = "macos"))]
     {
-        sb = sb
-            .separator()
-            .item(&PredefinedMenuItem::quit(app, Some("Quit"))?);
+        sb = sb.separator().item(
+            &MenuItemBuilder::with_id("app.quit", "Quit")
+                .accelerator("Ctrl+Q")
+                .build(app)?,
+        );
     }
 
     sb.build()
