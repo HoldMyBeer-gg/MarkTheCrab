@@ -127,6 +127,11 @@ pub fn confirm_close(window: tauri::Window) {
 }
 
 #[tauri::command]
+pub fn quit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 pub fn refresh_recent_menu(app: AppHandle) -> Result<(), String> {
     menu::refresh(&app).map_err(|e| e.to_string())
 }
