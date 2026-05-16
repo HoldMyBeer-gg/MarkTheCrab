@@ -1,15 +1,15 @@
 {
   "name": "markthecrab",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
     "build:mascot": "node scripts/build-mascot.mjs",
     "build:wasm": "node scripts/build-wasm.mjs",
-    "build:web": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting --external:./wasm/pkg/* --loader:.aff=text --loader:.dic=text && node scripts/copy-vendor.js",
+    "build:web": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting --external:./wasm/pkg/* --external:@upsetjs/venn.js --loader:.aff=text --loader:.dic=text && node scripts/copy-vendor.js",
     "build": "npm run build:web",
     "build:demo": "npm run build:wasm && npm run build:web",
-    "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/* --loader:.aff=text --loader:.dic=text",
+    "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/* --external:@upsetjs/venn.js --loader:.aff=text --loader:.dic=text",
     "tauri": "tauri"
   },
   "devDependencies": {

@@ -8,6 +8,12 @@ use tauri::{AppHandle, State};
 pub struct AppState {
     pub settings: Mutex<Settings>,
     pub current_file: Mutex<Option<String>>,
+    pub pending_open_file: Mutex<Option<String>>,
+}
+
+#[tauri::command]
+pub fn take_pending_open_file(state: State<AppState>) -> Option<String> {
+    state.pending_open_file.lock().unwrap().take()
 }
 
 #[tauri::command]

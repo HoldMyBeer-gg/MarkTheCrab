@@ -1,6 +1,6 @@
 {
   "productName": "MarkTheCrab",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "gg.holdmybeer.markthecrab",
   "build": {
     "beforeDevCommand": "npm run build",
@@ -35,6 +35,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd", "mkdn", "mdwn"],
+        "name": "Markdown Document",
+        "description": "Markdown text document",
+        "role": "Editor",
+        "mimeType": "text/markdown"
+      }
     ]
   },
   "plugins": {}
