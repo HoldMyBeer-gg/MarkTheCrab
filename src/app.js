@@ -78,10 +78,28 @@ async function init() {
 
   // Mascot: empty-state overlay + first-launch welcome
   setupMascot();
-  maybeShowWelcome();
+
+  // Open file passed via CLI args, file-association double-click, or
+  // `open foo.md` on macOS. Falls back to welcome dialog on first launch.
+  const opened = await maybeOpenStartupFile();
+  if (!opened) maybeShowWelcome();
 
   // Load tutorial or empty
   updatePreview("");
+}
+
+async function maybeOpenStartupFile() {
+  if (isBrowser) return false;
+  try {
+    const path = await invoke("take_pending_open_file");
+    if (path) {
+      await loadFile(path);
+      return true;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  return false;
 }
 
 // ────── MASCOT LAYER ──────────────────────────────────────────────
@@ -136,6 +154,10 @@ async function setupMenuEvents() {
     await dispatchMenu(id);
   });
   await tauriEvent.listen("mtc:menu:open-recent", async (e) => {
+    const path = typeof e.payload === "string" ? e.payload : null;
+    if (path) await openRecent(path);
+  });
+  await tauriEvent.listen("mtc:open-path", async (e) => {
     const path = typeof e.payload === "string" ? e.payload : null;
     if (path) await openRecent(path);
   });
@@ -1453,6 +1475,66 @@ function setupClipboardPaste() {
     },
     true
   );
+
+  // Reverse direction: preview → editor. Find the marker pair bracketing
+  // the preview's scrollTop, interpolate a fractional source line, then
+  // translate that to an editor scrollTop via CodeMirror block heights.
+  previewPane.addEventListener("scroll", () => {
+    if (isSyncing) return;
+    if (!editor) return;
+    const markers = getMarkers();
+    if (markers.length === 0) return;
+    const scroller = editorEl.querySelector(".cm-scroller");
+    if (!scroller) return;
+
+    const y = previewPane.scrollTop;
+
+    // Binary search on marker `top`. Markers come from DOM order so they're
+    // monotonic in top under normal layout.
+    let lo = 0;
+    let hi = markers.length - 1;
+    let idx = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (markers[mid].top <= y) {
+        idx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    const current = markers[idx];
+    const next = markers[idx + 1];
+
+    let fracLine = current ? current.line : 0;
+    if (current && next && next.top > current.top) {
+      const frac = (y - current.top) / (next.top - current.top);
+      fracLine = current.line + frac * (next.line - current.line);
+    } else if (!current && next) {
+      fracLine = next.line;
+    }
+
+    let editorTop;
+    try {
+      const doc = editor.state.doc;
+      const maxLine = doc.lines;
+      const baseLineNum = Math.min(Math.max(Math.floor(fracLine) + 1, 1), maxLine);
+      const baseBlock = editor.lineBlockAt(doc.line(baseLineNum).from);
+      if (baseLineNum < maxLine) {
+        const nextBlock = editor.lineBlockAt(doc.line(baseLineNum + 1).from);
+        const frac = fracLine - Math.floor(fracLine);
+        editorTop = baseBlock.top + frac * (nextBlock.top - baseBlock.top);
+      } else {
+        editorTop = baseBlock.top;
+      }
+    } catch (_) {
+      return;
+    }
+
+    isSyncing = true;
+    scroller.scrollTop = editorTop;
+    requestAnimationFrame(() => (isSyncing = false));
+  });
 })();
 
 // When the preview is copied, scrub the scroll-sync anchors out of the
