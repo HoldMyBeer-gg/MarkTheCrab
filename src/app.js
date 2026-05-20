@@ -1373,8 +1373,25 @@ function setupClipboardPaste() {
 // Invalidates the cache on every preview re-render.
 (function setupSyncScroll() {
   const editorEl = document.getElementById("editor");
-  let isSyncing = false;
   let markersCache = null;
+
+  // Which pane the user is actively driving; the other pane follows.
+  // A programmatic scroll fires an echo `scroll` event on the follower,
+  // and WKWebView can deliver that echo several frames late. The old
+  // single-rAF `isSyncing` flag had already cleared by then, so the
+  // follower treated the echo as a real user scroll and yanked the
+  // driver back — scrolling the editor to the bottom made it crawl
+  // back to the top. Track an owner with a short timeout instead: it
+  // outlives a late echo, and every genuine scroll event refreshes it.
+  let scrollOwner = null; // "editor" | "preview" | null
+  let scrollOwnerTimer = 0;
+  function claimScroll(owner) {
+    scrollOwner = owner;
+    clearTimeout(scrollOwnerTimer);
+    scrollOwnerTimer = setTimeout(() => {
+      scrollOwner = null;
+    }, 120);
+  }
 
   // Invalidate cache when preview changes. We bump via a MutationObserver
   // so any caller (including mermaid/katex async passes) is covered.
@@ -1440,7 +1457,7 @@ function setupClipboardPaste() {
   editorEl.addEventListener(
     "scroll",
     () => {
-      if (isSyncing) return;
+      if (scrollOwner === "preview") return;
       const markers = getMarkers();
       if (markers.length === 0 || !previewPane) return;
       const topLine = editorTopLine();
@@ -1469,9 +1486,8 @@ function setupClipboardPaste() {
         target = next.top;
       }
 
-      isSyncing = true;
+      claimScroll("editor");
       previewPane.scrollTop = target;
-      requestAnimationFrame(() => (isSyncing = false));
     },
     true
   );
@@ -1480,7 +1496,7 @@ function setupClipboardPaste() {
   // the preview's scrollTop, interpolate a fractional source line, then
   // translate that to an editor scrollTop via CodeMirror block heights.
   previewPane.addEventListener("scroll", () => {
-    if (isSyncing) return;
+    if (scrollOwner === "editor") return;
     if (!editor) return;
     const markers = getMarkers();
     if (markers.length === 0) return;
@@ -1531,9 +1547,8 @@ function setupClipboardPaste() {
       return;
     }
 
-    isSyncing = true;
+    claimScroll("preview");
     scroller.scrollTop = editorTop;
-    requestAnimationFrame(() => (isSyncing = false));
   });
 })();
 
