@@ -269,12 +269,18 @@ html, body {
    counter with the given separator. */
 #preview ol {
   counter-reset: mtc-ol;
-  list-style: none;
+  /* The hierarchical counter below draws the marker via ::before.
+     Themes that set list-style-type on ol (e.g. github's lower-roman)
+     get scoped to #preview and load after this file, so a plain
+     list-style:none loses on cascade order and the native marker
+     reappears, colliding with our ::before. Force it off. */
+  list-style: none !important;
   padding-left: 2.4em;
 }
 #preview ol > li {
   counter-increment: mtc-ol;
   position: relative;
+  list-style: none !important;
 }
 #preview ol > li::before {
   content: counters(mtc-ol, ".") ".";
