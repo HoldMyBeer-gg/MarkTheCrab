@@ -813,6 +813,19 @@ fn sanitize_html(html: &str) -> String {
         .add_tag_attributes("li", &["class"])
         .add_tag_attributes("div", &["class"])
         .add_tag_attributes("span", &["class"])
+        // Inline images are embedded as `data:` URLs (iOS image insert, and
+        // clipboard paste in the browser demo). `data` isn't in ammonia's
+        // default scheme allowlist, so without this the sanitizer strips the
+        // image's `src` and nothing renders.
+        .add_url_schemes(&["data"])
+        // ...but only ever as an image source. A `data:text/html` link target
+        // would be an XSS vector, so drop `data:` anywhere that isn't img/src.
+        .attribute_filter(|element, attribute, value| {
+            if value.starts_with("data:") && !(element == "img" && attribute == "src") {
+                return None;
+            }
+            Some(value.into())
+        })
         .link_rel(Some("noopener noreferrer"))
         .clean(html)
         .to_string()
@@ -908,6 +921,26 @@ mod tests {
         assert!(
             result.contains("after"),
             "content after fence lost: {result}"
+        );
+    }
+
+    #[test]
+    fn test_data_url_image_survives() {
+        let md = "![pic](data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==)";
+        let result = render_markdown(md);
+        assert!(
+            result.contains("src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==\""),
+            "data image src must survive sanitization: {result}"
+        );
+    }
+
+    #[test]
+    fn test_data_url_link_dropped() {
+        let md = "[click](data:text/html,<script>alert(1)</script>)";
+        let result = render_markdown(md);
+        assert!(
+            !result.contains("href=\"data:"),
+            "data: link target must be stripped: {result}"
         );
     }
 

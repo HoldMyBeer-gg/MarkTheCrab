@@ -1,6 +1,6 @@
 {
   "productName": "MarkTheCrab",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "identifier": "gg.holdmybeer.markthecrab",
   "build": {
     "beforeDevCommand": "npm run build",
@@ -29,6 +29,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "iOS": {
+      "developmentTeam": "9K9869699U"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

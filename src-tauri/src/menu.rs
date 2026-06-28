@@ -1,8 +1,59 @@
 use crate::commands::AppState;
+use std::sync::atomic::{AtomicU32, Ordering};
 use tauri::menu::{
     Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, Submenu, SubmenuBuilder,
 };
 use tauri::{AppHandle, Emitter, Manager, Runtime};
+
+// Runtime-created windows need labels distinct from the config window ("main").
+static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Open a fresh editor window. Each starts empty (the frontend's
+/// `take_pending_open_file` returns None for all but the first launch).
+pub fn new_window<R: Runtime>(app: &AppHandle<R>) {
+    // Opening a window cancels any in-progress quit.
+    crate::commands::QUITTING.store(false, Ordering::SeqCst);
+    let n = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let label = format!("main-{n}");
+    if let Err(e) =
+        tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App("index.html".into()))
+            .title("MarkTheCrab")
+            .inner_size(1308.0, 800.0)
+            .min_inner_size(950.0, 400.0)
+            .build()
+    {
+        eprintln!("failed to open new window {label}: {e}");
+    }
+}
+
+/// Emit a menu-driven event to the focused window only. With multiple
+/// windows open, broadcasting (`app.emit`) would, e.g., save every window
+/// on a single Cmd+S. `emit_to(label, ..)` only reaches that window's
+/// scoped listeners (see the frontend's per-window `listen`). Falls back to
+/// a broadcast if nothing is focused.
+fn emit_focused<R: Runtime, S: serde::Serialize + Clone>(
+    app: &AppHandle<R>,
+    event: &str,
+    payload: S,
+) {
+    match focused_label(app) {
+        Some(label) => {
+            let _ = app.emit_to(label, event, payload);
+        }
+        None => {
+            let _ = app.emit(event, payload);
+        }
+    }
+}
+
+/// Label of the currently focused window, if any. (`get_focused_window` is
+/// behind the unstable feature, so we scan the stable window list instead.)
+pub fn focused_label<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    app.webview_windows()
+        .into_iter()
+        .find(|(_, w)| w.is_focused().unwrap_or(false))
+        .map(|(label, _)| label)
+}
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let menu = build(app)?;
@@ -53,8 +104,11 @@ fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
 }
 
 fn file_menu<R: Runtime>(app: &AppHandle<R>, recents: &[String]) -> tauri::Result<Submenu<R>> {
-    let new_item = MenuItemBuilder::with_id("file.new", "New")
+    let new_item = MenuItemBuilder::with_id("file.new", "New Window")
         .accelerator("CmdOrCtrl+N")
+        .build(app)?;
+    let new_tab_item = MenuItemBuilder::with_id("file.new_tab", "New Tab")
+        .accelerator("CmdOrCtrl+T")
         .build(app)?;
     let open_item = MenuItemBuilder::with_id("file.open", "Open...")
         .accelerator("CmdOrCtrl+O")
@@ -79,6 +133,7 @@ fn file_menu<R: Runtime>(app: &AppHandle<R>, recents: &[String]) -> tauri::Resul
     #[cfg_attr(target_os = "macos", allow(unused_mut))]
     let mut sb = SubmenuBuilder::new(app, "File")
         .item(&new_item)
+        .item(&new_tab_item)
         .item(&open_item)
         .item(&recent_sub)
         .separator()
@@ -250,6 +305,10 @@ fn help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>> {
 }
 
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
+    if id == "file.new" {
+        new_window(app);
+        return;
+    }
     if let Some(rest) = id.strip_prefix("file.recent.") {
         match rest {
             "empty" => {}
@@ -261,7 +320,7 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
                     let _ = s.save();
                 }
                 let _ = refresh(app);
-                let _ = app.emit("mtc:menu", "file.recent.cleared");
+                emit_focused(app, "mtc:menu", "file.recent.cleared".to_string());
             }
             other => {
                 if let Ok(idx) = other.parse::<usize>() {
@@ -271,12 +330,12 @@ pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
                         s.recent_files.get(idx).cloned()
                     };
                     if let Some(p) = path {
-                        let _ = app.emit("mtc:menu:open-recent", p);
+                        emit_focused(app, "mtc:menu:open-recent", p);
                     }
                 }
             }
         }
         return;
     }
-    let _ = app.emit("mtc:menu", id.to_string());
+    emit_focused(app, "mtc:menu", id.to_string());
 }

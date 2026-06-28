@@ -1,6 +1,6 @@
 {
   "name": "markthecrab",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
@@ -8,12 +8,15 @@
     "build:wasm": "node scripts/build-wasm.mjs",
     "build:web": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --minify --splitting --external:./wasm/pkg/* --external:@upsetjs/venn.js --loader:.aff=text --loader:.dic=text && node scripts/copy-vendor.js",
     "build": "npm run build:web",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build:demo": "npm run build:wasm && npm run build:web",
     "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/* --external:@upsetjs/venn.js --loader:.aff=text --loader:.dic=text",
     "tauri": "tauri"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.1"
+    "@tauri-apps/cli": "^2.10.1",
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",

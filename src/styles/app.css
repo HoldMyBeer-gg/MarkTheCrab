@@ -81,7 +81,7 @@ html, body {
 /* Layout */
 .main {
   display: flex;
-  height: calc(100vh - 40px - 28px); /* minus toolbar and statusbar */
+  height: calc(100vh - 40px - 36px - 28px); /* minus toolbar, tab bar, statusbar */
   overflow: hidden;
 }
 
