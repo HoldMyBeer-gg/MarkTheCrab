@@ -1,13 +1,23 @@
+#[cfg(desktop)]
 use crate::menu;
 use crate::settings::Settings;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use tauri::{AppHandle, State};
+
+/// Set while a Cmd+Q quit is in progress so the window-destroyed handler
+/// knows to exit the app once the last window closes (see lib.rs).
+pub static QUITTING: AtomicBool = AtomicBool::new(false);
 
 pub struct AppState {
     pub settings: Mutex<Settings>,
-    pub current_file: Mutex<Option<String>>,
+    // The active file is per-window (keyed by window label) so each window
+    // saves images relative to its own document, not whichever window most
+    // recently set the path.
+    pub current_file: Mutex<HashMap<String, Option<String>>>,
     pub pending_open_file: Mutex<Option<String>>,
 }
 
@@ -19,6 +29,35 @@ pub fn take_pending_open_file(state: State<AppState>) -> Option<String> {
 #[tauri::command]
 pub fn render_markdown(text: &str) -> String {
     markdown_core::render_markdown(text)
+}
+
+// Lets the frontend branch its file UI by target. iOS has no native
+// save-as path picker and a sandboxed filesystem, so it swaps in an in-app
+// filename prompt and writes into the app's Documents directory instead.
+#[tauri::command]
+pub fn platform() -> &'static str {
+    if cfg!(target_os = "ios") {
+        "ios"
+    } else if cfg!(target_os = "android") {
+        "android"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "windows") {
+        "windows"
+    } else {
+        "linux"
+    }
+}
+
+// Absolute path to the app's Documents directory. On iOS this is the only
+// writable location for user files; desktop save-as doesn't use it.
+#[tauri::command]
+pub fn documents_dir(app: AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    app.path()
+        .document_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -127,25 +166,74 @@ pub fn stat_mtime(path: &str) -> Result<Option<u64>, String> {
     }
 }
 
+// Closing a window is desktop-only; mobile apps don't destroy windows.
+// The stub keeps the command callable from the frontend everywhere.
+#[cfg(desktop)]
 #[tauri::command]
 pub fn confirm_close(window: tauri::Window) {
     let _ = window.destroy();
 }
 
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn confirm_close() {}
+
+// Opening a window is desktop-only. The frontend's Cmd+N keydown invokes
+// this because the native menu accelerator is preempted by the webview when
+// the editor has focus, so the keyboard path can't rely on the menu.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn new_window(app: AppHandle) {
+    menu::new_window(&app);
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+pub fn new_window() {}
+
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
+    // Close every window so each runs its own unsaved-changes guard. The app
+    // exits once the last window is destroyed (handled in lib.rs). Closing
+    // (not exiting) avoids losing unsaved work in non-focused windows.
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+        QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+        let windows = app.webview_windows();
+        if windows.is_empty() {
+            app.exit(0);
+            return;
+        }
+        for (_, window) in windows {
+            let _ = window.close();
+        }
+    }
+    #[cfg(not(desktop))]
     app.exit(0);
 }
 
+// The native recent-files menu is a desktop-only concept. On mobile the
+// command still exists (the frontend calls it) but does nothing, so the
+// invoke handler list stays identical across every target.
+#[cfg(desktop)]
 #[tauri::command]
 pub fn refresh_recent_menu(app: AppHandle) -> Result<(), String> {
     menu::refresh(&app).map_err(|e| e.to_string())
 }
 
+#[cfg(not(desktop))]
 #[tauri::command]
-pub fn set_current_file(state: State<AppState>, path: Option<String>) {
-    let mut current = state.current_file.lock().unwrap();
-    *current = path.clone();
+pub fn refresh_recent_menu() -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_current_file(window: tauri::Window, state: State<AppState>, path: Option<String>) {
+    {
+        let mut current = state.current_file.lock().unwrap();
+        current.insert(window.label().to_string(), path.clone());
+    }
     if let Some(ref p) = path {
         let mut settings = state.settings.lock().unwrap();
         settings.add_recent_file(p);
@@ -154,8 +242,14 @@ pub fn set_current_file(state: State<AppState>, path: Option<String>) {
 }
 
 #[tauri::command]
-pub fn get_current_file(state: State<AppState>) -> Option<String> {
-    state.current_file.lock().unwrap().clone()
+pub fn get_current_file(window: tauri::Window, state: State<AppState>) -> Option<String> {
+    state
+        .current_file
+        .lock()
+        .unwrap()
+        .get(window.label())
+        .cloned()
+        .flatten()
 }
 
 #[tauri::command]
@@ -167,11 +261,15 @@ pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &
 /// Returns the relative path suitable for embedding in markdown.
 #[tauri::command]
 pub fn save_image(
+    window: tauri::Window,
     state: State<AppState>,
     image_data: Vec<u8>,
     filename: String,
 ) -> Result<String, String> {
-    let current = state.current_file.lock().unwrap();
+    let current = {
+        let map = state.current_file.lock().unwrap();
+        map.get(window.label()).cloned().flatten()
+    };
     let base_dir = match current.as_deref() {
         Some(path) => Path::new(path)
             .parent()

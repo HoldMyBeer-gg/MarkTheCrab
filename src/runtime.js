@@ -42,6 +42,10 @@ if (isTauri) {
     convertFileSrc: tauri.core.convertFileSrc,
     dialog: tauri.dialog,
     event: tauri.event,
+    // The current window, used to scope event listeners so menu / close /
+    // open-path events only fire in the window they were emitted to. Null if
+    // the webviewWindow module isn't available (callers fall back to global).
+    currentWindow: tauri.webviewWindow?.getCurrentWebviewWindow?.() ?? null,
     isBrowser: false,
   };
 } else {
@@ -58,6 +62,7 @@ export const invoke = api.invoke;
 export const convertFileSrc = api.convertFileSrc;
 export const dialog = api.dialog;
 export const event = api.event;
+export const currentWindow = api.currentWindow ?? null;
 export const isBrowser = api.isBrowser;
 
 async function createBrowserApi() {
@@ -208,6 +213,9 @@ async function createBrowserApi() {
     switch (name) {
       case "render_markdown":
         return wasm.renderMarkdown(args.text ?? "");
+
+      case "platform":
+        return "browser";
 
       case "export_html":
         return wasm.exportHtml(

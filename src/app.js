@@ -1,21 +1,38 @@
-import { createEditor, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
+import { createEditor, createDocState, activateState, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
 import hljs from "./hljs-setup.js";
 import { Mascot } from "./mascot.js";
 
 // Make hljs available globally for preview highlighting
 window.hljs = hljs;
 
-import { invoke, convertFileSrc, dialog, event as tauriEvent, isBrowser } from "./runtime.js";
+import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
+import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 const { open, save, message, ask } = dialog;
 
 // State
 let editor;
+// The active document's fields are mirrored into these globals so the many
+// callers that read them (save, preview image base, etc.) need no rewrite.
+// They are kept in sync with the active tab on every switch.
 let currentFile = null;
 let currentFileMtime = null; // ms since epoch, for external-change detection
 let isModified = false;
 let settings = {};
+
+// ────── TABS ──────────────────────────────────────────────────────
+// Each open document is a tab. A tab owns its own CodeMirror EditorState
+// (isolated undo history, selection and content) plus file metadata. The
+// live editor view shows the active tab; inactive tabs live in `state`.
+let tabs = [];
+let activeTabId = null;
+let tabSeq = 0;
+// Set while swapping the editor to another tab's state, so the swap isn't
+// mistaken for a user edit (which would mark the incoming tab modified).
+let suppressChange = false;
 let previewVisible = true;
 let renderTimeout = null;
+let platformName = "desktop";
+let isMobile = false; // iOS/Android: no native save-as picker, sandboxed fs
 
 // Elements
 const previewEl = document.getElementById("preview");
@@ -24,6 +41,9 @@ const editorPane = document.getElementById("editor-pane");
 const mainEl = document.getElementById("main");
 const toolbarEl = document.getElementById("toolbar");
 const statusbarEl = document.getElementById("statusbar");
+const tabbarEl = document.getElementById("tabbar");
+const tabListEl = document.getElementById("tab-list");
+const tabNewBtn = document.getElementById("tab-new");
 
 // Status bar elements
 const statusFile = document.getElementById("status-file");
@@ -37,6 +57,26 @@ const themeCache = {};
 let currentThemeLink = null;
 
 async function init() {
+  // Detect the platform up front so the file UI (save, image picking) can
+  // branch: iOS has no native save-as path picker and a sandboxed fs.
+  try {
+    platformName = await invoke("platform");
+  } catch (_) {
+    platformName = "desktop";
+  }
+  isMobile = isMobilePlatform(platformName);
+  document.documentElement.dataset.mtcPlatform = platformName;
+
+  // On mobile there's no print dialog; the print action opens the native
+  // share sheet (which offers Print / Save to PDF), so label it as Share.
+  if (isMobile) {
+    const printBtn = document.querySelector('[data-action="print"]');
+    if (printBtn) {
+      printBtn.title = "Share";
+      printBtn.setAttribute("aria-label", "Share");
+    }
+  }
+
   // Load settings from Rust backend
   settings = await invoke("load_settings");
 
@@ -61,6 +101,9 @@ async function init() {
   // Set up dialogs
   setupDialogs();
 
+  // Keep preview links from navigating the webview away (and nuking the app)
+  setupPreviewLinks();
+
   // Set up drag-drop
   setupDragDrop();
 
@@ -78,6 +121,10 @@ async function init() {
 
   // Mascot: empty-state overlay + first-launch welcome
   setupMascot();
+
+  // Tabs: start with one empty Untitled tab backed by the live editor.
+  initTabs();
+  setupTabBar();
 
   // Open file passed via CLI args, file-association double-click, or
   // `open foo.md` on macOS. Falls back to welcome dialog on first launch.
@@ -147,17 +194,27 @@ async function maybeShowWelcome() {
   }
 }
 
+// Listen scoped to this window when possible. The native menu and the Rust
+// open/close events are emitted to a single window (emit_to), so each window
+// must register its own scoped listener; a plain global `event.listen` is an
+// "Any" sniffer that would fire in every window. Falls back to the global
+// listener (single-window behavior) if the current window isn't available.
+function listenScoped(event, handler) {
+  if (currentWindow) return currentWindow.listen(event, handler);
+  return tauriEvent.listen(event, handler);
+}
+
 async function setupMenuEvents() {
   if (!tauriEvent || isBrowser) return;
-  await tauriEvent.listen("mtc:menu", async (e) => {
+  await listenScoped("mtc:menu", async (e) => {
     const id = typeof e.payload === "string" ? e.payload : "";
     await dispatchMenu(id);
   });
-  await tauriEvent.listen("mtc:menu:open-recent", async (e) => {
+  await listenScoped("mtc:menu:open-recent", async (e) => {
     const path = typeof e.payload === "string" ? e.payload : null;
     if (path) await openRecent(path);
   });
-  await tauriEvent.listen("mtc:open-path", async (e) => {
+  await listenScoped("mtc:open-path", async (e) => {
     const path = typeof e.payload === "string" ? e.payload : null;
     if (path) await openRecent(path);
   });
@@ -165,7 +222,8 @@ async function setupMenuEvents() {
 
 async function dispatchMenu(id) {
   switch (id) {
-    case "file.new": return newFile();
+    case "file.new": return newWindow();
+    case "file.new_tab": return newFile();
     case "file.open": return openFile();
     case "file.save": return saveFile();
     case "file.save_as": return saveFileAs();
@@ -222,15 +280,30 @@ async function confirmDiscardUnsaved() {
   );
 }
 
+// Quit / window-close guard: any tab with unsaved changes counts.
+async function confirmDiscardAllUnsaved() {
+  saveActiveTabState(); // flush the live editor into the active tab first
+  const dirty = tabs.filter((t) => t.isModified).length;
+  if (dirty === 0) return true;
+  return await ask(
+    dirty > 1
+      ? `You have unsaved changes in ${dirty} tabs. Close without saving?`
+      : "You have unsaved changes. Close without saving?",
+    { title: "Unsaved changes", kind: "warning", okLabel: "Discard", cancelLabel: "Keep editing" }
+  );
+}
+
 async function quitApp() {
-  if (!(await confirmDiscardUnsaved())) return;
+  // quit_app closes every window; each window's close guard
+  // (mtc:close-requested) prompts for its own unsaved changes before the app
+  // exits, so no pre-check here (it would double-prompt the focused window).
   await invoke("quit_app");
 }
 
 async function setupCloseGuard() {
   if (!tauriEvent) return;
-  await tauriEvent.listen("mtc:close-requested", async () => {
-    if (!(await confirmDiscardUnsaved())) return;
+  await listenScoped("mtc:close-requested", async () => {
+    if (!(await confirmDiscardAllUnsaved())) return;
     await invoke("confirm_close");
   });
 }
@@ -385,8 +458,8 @@ function scopeSelector(raw, scope) {
 }
 
 function onContentChange(content) {
-  isModified = true;
-  statusModified.classList.remove("hidden");
+  if (suppressChange) return;
+  setActiveModified(true);
 
   // Debounce preview rendering
   clearTimeout(renderTimeout);
@@ -692,40 +765,221 @@ function resolvePreviewImageSrcs() {
   });
 }
 
-function parentDir(p) {
-  const sep = p.includes("\\") && !p.includes("/") ? "\\" : "/";
-  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
-  return i >= 0 ? p.slice(0, i) : "";
+// ────── Tab management ─────────────────────────────────────────────
+
+function initTabs() {
+  const t = newTab();
+  t.state = editor.state; // back the first tab with the live (empty) state
+  tabs = [t];
+  activeTabId = t.id;
+  renderTabs();
 }
 
-function joinPath(dir, rel) {
-  const useBackslash = dir.includes("\\") && !dir.includes("/");
-  const sep = useBackslash ? "\\" : "/";
-  const trimmed = dir.replace(/[\\/]+$/, "");
-  const cleanedRel = rel.replace(/^[\\/]+/, "");
-  return `${trimmed}${sep}${cleanedRel}`;
+function activeTab() {
+  return tabs.find((t) => t.id === activeTabId) || null;
+}
+
+function tabTitle(t) {
+  if (t.file) return t.file.split(/[\\/]/).pop();
+  return t.title || "Untitled";
+}
+
+function editorScroller() {
+  return document.querySelector("#editor .cm-scroller");
+}
+
+// Snapshot the live editor (content, selection, scroll) and the active-tab
+// mirror globals back into the active tab object before we switch away.
+function saveActiveTabState() {
+  const t = activeTab();
+  if (!t) return;
+  t.state = editor.state;
+  const scroller = editorScroller();
+  t.scrollTop = scroller ? scroller.scrollTop : 0;
+  t.file = currentFile;
+  t.mtime = currentFileMtime;
+  t.isModified = isModified;
+}
+
+// Make `t` the active tab: swap the editor to its state, mirror its metadata
+// into the globals, and refresh status bar + preview. Assumes any outgoing
+// tab has already been saved (or there is none).
+function mountTab(t) {
+  activeTabId = t.id;
+  currentFile = t.file;
+  currentFileMtime = t.mtime;
+  isModified = t.isModified;
+
+  suppressChange = true;
+  activateState(editor, t.state);
+  suppressChange = false;
+  const scroller = editorScroller();
+  if (scroller) {
+    scroller.scrollTop = t.scrollTop || 0;
+    requestAnimationFrame(() => { scroller.scrollTop = t.scrollTop || 0; });
+  }
+
+  statusFile.textContent = tabTitle(t);
+  statusModified.classList.toggle("hidden", !t.isModified);
+  updateCursorStatus();
+  updateWordCountStatus();
+  invoke("set_current_file", { path: t.file });
+  updatePreview(getContent(editor));
+  renderTabs();
+  refreshEmptyMascot();
+  editor.focus();
+}
+
+function newTab({ file = null, mtime = null, content = "", title = null } = {}) {
+  return {
+    id: ++tabSeq,
+    file,
+    mtime,
+    title,
+    isModified: false,
+    state: createDocState(content),
+    scrollTop: 0,
+  };
+}
+
+// Open a brand-new document in a fresh tab and focus it.
+function openInNewTab(opts) {
+  saveActiveTabState();
+  const t = newTab(opts);
+  tabs.push(t);
+  mountTab(t);
+  return t;
+}
+
+function activateTab(id) {
+  if (id === activeTabId) return;
+  const t = tabs.find((x) => x.id === id);
+  if (!t) return;
+  saveActiveTabState();
+  mountTab(t);
+}
+
+function cycleTab(dir) {
+  if (tabs.length < 2) return;
+  const idx = tabs.findIndex((t) => t.id === activeTabId);
+  const next = tabs[(idx + dir + tabs.length) % tabs.length];
+  activateTab(next.id);
+}
+
+async function closeTab(id) {
+  const idx = tabs.findIndex((t) => t.id === id);
+  if (idx === -1) return;
+
+  // Bring the tab to the front so the discard prompt is about a visible doc.
+  if (id !== activeTabId) activateTab(id);
+  if (!(await confirmDiscardUnsaved())) return;
+
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    const t = newTab();
+    tabs.push(t);
+    activeTabId = null;
+    mountTab(t);
+    return;
+  }
+  activeTabId = null; // force mountTab to perform the swap
+  mountTab(tabs[Math.min(idx, tabs.length - 1)]);
+}
+
+// Reflect the active tab's modified flag into globals, status bar and the
+// tab's dot without a full re-render.
+function setActiveModified(on) {
+  isModified = on;
+  const t = activeTab();
+  if (t) t.isModified = on;
+  statusModified.classList.toggle("hidden", !on);
+  const dot = tabListEl?.querySelector(`.tab[data-tab-id="${activeTabId}"] .tab-dot`);
+  if (dot) dot.classList.toggle("visible", on);
+}
+
+function updateWordCountStatus() {
+  const { words, chars } = getWordCount(editor);
+  statusWords.textContent = `${words} words`;
+  statusChars.textContent = `${chars} chars`;
+}
+
+function updateCursorStatus() {
+  const pos = editor.state.selection.main.head;
+  const line = editor.state.doc.lineAt(pos);
+  statusCursor.textContent = `Ln ${line.number}, Col ${pos - line.from + 1}`;
+}
+
+function renderTabs() {
+  if (!tabListEl) return;
+  tabListEl.innerHTML = "";
+  for (const t of tabs) {
+    const isActive = t.id === activeTabId;
+    const modified = isActive ? isModified : t.isModified;
+
+    const el = document.createElement("div");
+    el.className = "tab" + (isActive ? " active" : "");
+    el.setAttribute("role", "tab");
+    el.setAttribute("aria-selected", String(isActive));
+    el.dataset.tabId = String(t.id);
+    el.title = t.file || tabTitle(t);
+
+    const label = document.createElement("span");
+    label.className = "tab-label";
+    label.textContent = tabTitle(t);
+    el.appendChild(label);
+
+    const dot = document.createElement("span");
+    dot.className = "tab-dot" + (modified ? " visible" : "");
+    dot.setAttribute("aria-hidden", "true");
+    el.appendChild(dot);
+
+    const close = document.createElement("button");
+    close.className = "tab-close";
+    close.type = "button";
+    close.setAttribute("aria-label", `Close ${tabTitle(t)}`);
+    close.textContent = "×";
+    el.appendChild(close);
+
+    tabListEl.appendChild(el);
+  }
+}
+
+function setupTabBar() {
+  tabListEl.addEventListener("click", (e) => {
+    const tabEl = e.target.closest(".tab");
+    if (!tabEl) return;
+    const id = parseInt(tabEl.dataset.tabId, 10);
+    if (e.target.closest(".tab-close")) {
+      closeTab(id);
+    } else {
+      activateTab(id);
+    }
+  });
+  // Middle-click closes a tab.
+  tabListEl.addEventListener("auxclick", (e) => {
+    if (e.button !== 1) return;
+    const tabEl = e.target.closest(".tab");
+    if (!tabEl) return;
+    e.preventDefault();
+    closeTab(parseInt(tabEl.dataset.tabId, 10));
+  });
+  if (tabNewBtn) tabNewBtn.addEventListener("click", () => newFile());
 }
 
 // File operations
 async function newFile() {
-  if (isModified) {
-    const proceed = await message("You have unsaved changes. Discard them?", {
-      title: "New File",
-      kind: "warning",
-      okLabel: "Discard",
-      cancelLabel: "Cancel",
-    });
-    if (!proceed) return;
+  openInNewTab();
+}
+
+// Open a brand-new window (Cmd+N). The browser build has no concept of OS
+// windows, so it falls back to a new tab.
+async function newWindow() {
+  if (isBrowser) { newFile(); return; }
+  try {
+    await invoke("new_window");
+  } catch (_) {
+    newFile();
   }
-  setContent(editor, "");
-  currentFile = null;
-  currentFileMtime = null;
-  isModified = false;
-  statusFile.textContent = "Untitled";
-  statusModified.classList.add("hidden");
-  await invoke("set_current_file", { path: null });
-  updatePreview("");
-  refreshEmptyMascot();
 }
 
 async function openFile() {
@@ -740,17 +994,38 @@ async function openFile() {
 }
 
 async function loadFile(path) {
+  // Already open? Just switch to that tab.
+  const existing = tabs.find((t) => t.file === path);
+  if (existing) {
+    activateTab(existing.id);
+    await refreshRecentFiles();
+    return;
+  }
+
   const [content, mtime] = await invoke("read_file_with_mtime", { path });
-  setContent(editor, content);
-  currentFile = path;
-  currentFileMtime = mtime;
-  isModified = false;
-  statusFile.textContent = path.split(/[\\/]/).pop();
-  statusModified.classList.add("hidden");
-  await invoke("set_current_file", { path });
-  updatePreview(content);
+
+  // If the active tab is a pristine empty Untitled, load into it rather than
+  // leaving an empty tab behind (covers the very first open after launch).
+  const cur = activeTab();
+  if (cur && !cur.file && !cur.isModified && getContent(editor).trim() === "") {
+    setContent(editor, content);
+    currentFile = path;
+    currentFileMtime = mtime;
+    cur.file = path;
+    cur.mtime = mtime;
+    cur.title = null;
+    setActiveModified(false);
+    statusFile.textContent = path.split(/[\\/]/).pop();
+    await invoke("set_current_file", { path });
+    updatePreview(content);
+    renderTabs();
+    await refreshRecentFiles();
+    refreshEmptyMascot();
+    return;
+  }
+
+  openInNewTab({ file: path, mtime, content });
   await refreshRecentFiles();
-  refreshEmptyMascot();
 }
 
 async function refreshRecentFiles() {
@@ -783,17 +1058,26 @@ async function refreshRecentFiles() {
 }
 
 async function openRecent(path) {
-  if (isModified) {
-    const discard = await ask(
-      "You have unsaved changes. Open another file and discard them?",
-      { title: "Unsaved changes", kind: "warning", okLabel: "Discard", cancelLabel: "Cancel" }
-    );
-    if (!discard) return;
-  }
+  const resolved = await rebaseMobilePath(path);
   try {
-    await loadFile(path);
+    await loadFile(resolved);
   } catch (err) {
-    await message(`Could not open ${path}: ${err}`, { title: "Open failed", kind: "error" });
+    await message(`Could not open ${resolved}: ${err}`, { title: "Open failed", kind: "error" });
+  }
+}
+
+// iOS regenerates the app's sandbox container UUID on every reinstall, so a
+// stored absolute path under .../Documents/ goes stale after a new build.
+// Everything after the last "/Documents/" is stable, so re-base the tail
+// onto the live Documents directory. No-op on desktop.
+async function rebaseMobilePath(path) {
+  if (!isMobile) return path;
+  if (!path.includes("/Documents/")) return path;
+  try {
+    const dir = await invoke("documents_dir");
+    return rebaseDocumentsPath(path, dir);
+  } catch (_) {
+    return path;
   }
 }
 
@@ -818,13 +1102,15 @@ async function saveFile() {
 
   const content = getContent(editor);
   currentFileMtime = await invoke("write_file_with_mtime", { path: currentFile, content });
-  isModified = false;
-  statusModified.classList.add("hidden");
+  const t = activeTab();
+  if (t) t.mtime = currentFileMtime;
+  setActiveModified(false);
   Mascot.flash("#mascot-slot", "celebrating", 1200, 32);
   await refreshRecentFiles();
 }
 
 async function saveFileAs() {
+  if (isMobile) return saveFileAsMobile();
   const path = await save({
     filters: [
       { name: "Markdown", extensions: ["md"] },
@@ -839,22 +1125,124 @@ async function saveFileAs() {
   currentFile = path;
   currentFileMtime = null;
   statusFile.textContent = path.split(/[\\/]/).pop();
+  const t = activeTab();
+  if (t) { t.file = path; t.mtime = null; t.title = null; }
+  renderTabs();
   await invoke("set_current_file", { path });
   return saveFile();
 }
 
+// iOS save-as. There's no native save path picker, and the sandbox only
+// lets us write under the app's Documents directory. So: ask for a file
+// name in an editable in-app dialog (the native popup wasn't editable),
+// then write into Documents. Subsequent Ctrl/Cmd+S writes back to that
+// absolute path, which stays inside the sandbox.
+async function saveFileAsMobile() {
+  const suggested = currentFile ? currentFile.split("/").pop() : "untitled.md";
+  const name = await promptFilename(suggested);
+  if (!name) return;
+  const finalName = /\.\w+$/.test(name) ? name : `${name}.md`;
+
+  let dir;
+  try {
+    dir = await invoke("documents_dir");
+  } catch (e) {
+    await message(`Couldn't find a place to save: ${e}`, { title: "Save failed", kind: "error" });
+    return;
+  }
+  const path = `${dir.replace(/\/+$/, "")}/${finalName}`;
+
+  currentFile = path;
+  currentFileMtime = null;
+  statusFile.textContent = finalName;
+  const t = activeTab();
+  if (t) { t.file = path; t.mtime = null; t.title = null; }
+  renderTabs();
+  await invoke("set_current_file", { path });
+  return saveFile();
+}
+
+// Editable filename prompt for platforms without a usable native save
+// dialog. Resolves to the entered name, or null if cancelled.
+function promptFilename(defaultName) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById("filename-dialog");
+    const input = document.getElementById("filename-input");
+    input.value = defaultName || "untitled.md";
+
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      input.onkeydown = null;
+      if (dlg.open) dlg.close();
+      resolve(val);
+    };
+
+    document.getElementById("filename-save").onclick = () => finish(input.value.trim() || null);
+    document.getElementById("filename-cancel").onclick = () => finish(null);
+    dlg.addEventListener("close", () => finish(null), { once: true });
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(input.value.trim() || null);
+      }
+    };
+
+    dlg.showModal();
+    input.focus();
+    // Preselect the stem so renaming doesn't fight the extension.
+    const dot = input.value.lastIndexOf(".");
+    input.setSelectionRange(0, dot > 0 ? dot : input.value.length);
+  });
+}
+
 async function printPreview() {
+  // iOS WKWebView ignores window.print(), so route through the native share
+  // sheet instead (Web Share API). Sharing the rendered doc as an HTML file
+  // surfaces Print and Save-to-PDF among the share targets.
+  if (isMobile) return sharePreviewMobile();
+
   // Ensure the preview is rendered with current content; the print CSS
   // (see styles/app.css) hides chrome so only the preview prints. On
-  // macOS/iOS, Tauri shims window.print() to route through its webview
-  // plugin — that requires the `core:webview:allow-print` permission
-  // (see capabilities/default.json).
+  // macOS, Tauri routes window.print() through its webview plugin — that
+  // requires the `core:webview:allow-print` permission (see
+  // capabilities/default.json).
   const wasHidden = !previewVisible;
   if (wasHidden) togglePreview(true);
   await updatePreview(getContent(editor));
   await new Promise((r) => setTimeout(r, 50));
   window.print();
   if (wasHidden) togglePreview(false);
+}
+
+// iOS share: build a styled HTML file of the rendered document and hand it
+// to the native share sheet, which includes Print and Save to PDF.
+async function sharePreviewMobile() {
+  const content = getContent(editor);
+  const html = await invoke("export_html", {
+    markdownText: content,
+    styled: true,
+    theme: settings.theme,
+    customCss: settings.custom_css,
+  });
+  const base = (currentFile ? currentFile.split("/").pop() : "untitled").replace(/\.\w+$/, "");
+  const file = new File([html], `${base}.html`, { type: "text/html" });
+
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: base });
+    } else if (navigator.share) {
+      // Older WebKit without file sharing: share the text so the sheet still
+      // opens (Print may not appear for plain text).
+      await navigator.share({ title: base, text: content });
+    } else {
+      await message("Sharing isn't available on this device.", { title: "Share", kind: "error" });
+    }
+  } catch (e) {
+    if (e?.name === "AbortError") return; // user dismissed the sheet
+    await message(`Couldn't share: ${e?.message || e}`, { title: "Share failed", kind: "error" });
+  }
 }
 
 async function exportHtml(styled) {
@@ -958,15 +1346,57 @@ function setupToolbar() {
   }
 }
 
+// A click on a real link in the preview otherwise navigates the single
+// webview to that URL, replacing the whole app and discarding unsaved work.
+// On iOS there's no "back" to the app, so it reads as a blank window and the
+// document is gone. Intercept every external link: cancel the navigation and
+// hand the URL to the OS (system browser) when an opener is available. Empty
+// src-line anchors (no href) and in-document "#" anchors are left alone.
+function setupPreviewLinks() {
+  previewEl.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#")) return;
+
+    // Never let the webview navigate itself.
+    e.preventDefault();
+
+    try {
+      const opener =
+        window.__TAURI__?.opener?.openUrl ||
+        window.__TAURI__?.shell?.open;
+      if (opener) {
+        opener(a.href);
+      } else if (!isBrowser) {
+        // No opener plugin exposed; at least don't lose the doc.
+      } else {
+        window.open(a.href, "_blank", "noopener");
+      }
+    } catch (_) {
+      /* swallow — protecting the document is what matters */
+    }
+  });
+}
+
 // Keyboard shortcuts
 function setupShortcuts() {
   document.addEventListener("keydown", (e) => {
     const ctrl = e.ctrlKey || e.metaKey;
     const shift = e.shiftKey;
 
+    // Ctrl/Cmd+Tab cycles tabs (forward, or backward with Shift).
+    if (ctrl && e.key === "Tab") {
+      e.preventDefault();
+      cycleTab(shift ? -1 : 1);
+      return;
+    }
+
     if (ctrl && !shift) {
       switch (e.key.toLowerCase()) {
-        case "n": e.preventDefault(); newFile(); break;
+        case "n": e.preventDefault(); newWindow(); break;
+        case "t": e.preventDefault(); newFile(); break;
+        case "w": e.preventDefault(); if (activeTabId != null) closeTab(activeTabId); break;
         case "o": e.preventDefault(); openFile(); break;
         case "s": e.preventDefault(); saveFile(); break;
         case "p": e.preventDefault(); printPreview(); break;
@@ -1077,7 +1507,31 @@ function setupDialogs() {
   // Image dialog
   document.getElementById("image-cancel").onclick = () =>
     document.getElementById("image-dialog").close();
+  // iOS: drive the in-dialog file input (the WKWebView photo/Files picker)
+  // and embed the chosen image directly. The input is a child of the modal
+  // dialog so its picker presents from an active, non-inert subtree — the
+  // earlier body-appended input couldn't present its secondary picker.
+  const imageFileInput = document.getElementById("image-file-input");
+  imageFileInput.addEventListener("change", async () => {
+    const file = imageFileInput.files?.[0];
+    imageFileInput.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    document.getElementById("image-dialog").close();
+    try {
+      await handleImageFile(file);
+    } catch (e) {
+      await message(`Couldn't insert that image: ${e?.message || e}`, {
+        title: "Image failed",
+        kind: "error",
+      });
+    }
+  });
+
   document.getElementById("image-browse").onclick = async () => {
+    if (isMobile) {
+      imageFileInput.click();
+      return;
+    }
     const path = await open({
       filters: [
         { name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico"] },
@@ -1247,7 +1701,19 @@ function syncSettingsDialog() {
 
 function showSettings() {
   syncSettingsDialog();
-  document.getElementById("settings-dialog").showModal();
+  const dlg = document.getElementById("settings-dialog");
+  dlg.showModal();
+  // showModal() auto-focuses the first control, which here is the theme
+  // <select>. On iOS a focused select immediately pops its native picker, so
+  // opening settings lands the user inside the theme wheel. Move focus to the
+  // dialog title instead so it just opens to the top.
+  const title = document.getElementById("settings-dialog-title");
+  if (title) {
+    title.tabIndex = -1;
+    title.focus();
+  } else if (document.activeElement?.tagName === "SELECT") {
+    document.activeElement.blur();
+  }
 }
 
 function showCustomCss() {
@@ -1277,18 +1743,24 @@ async function showAbout() {
 // Image helpers
 const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i;
 
-// Wrap URLs that contain spaces/parens in CommonMark's `<...>` form so they
-// survive the `[alt](url)` syntax. Leaves clean URLs untouched to avoid
-// unnecessarily double-encoding pre-encoded remote links.
-function encodeMarkdownUrl(url) {
-  if (!url) return "";
-  if (/[\s()<>]/.test(url)) {
-    return `<${url.replace(/[<>]/g, "")}>`;
-  }
-  return url;
+// Read a picked file's bytes and build a base64 data URL. Goes through
+// arrayBuffer() rather than FileReader.readAsDataURL — iOS hands back
+// iCloud/HEIC-backed Files that FileReader can fail to read, while
+// arrayBuffer() materializes them reliably.
+async function fileToDataUrl(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = file.type || "image/png";
+  return `data:${type};base64,${bytesToBase64(bytes)}`;
 }
 
 async function handleImageFile(file) {
+  // On iOS there's no stable sibling images/ dir to reference, so embed the
+  // image inline as a data URL — it always renders and travels with the doc.
+  if (isMobile) {
+    const dataUrl = await fileToDataUrl(file);
+    insertAtCursor(editor, `![${file.name || "image"}](${dataUrl})\n`);
+    return;
+  }
   const buffer = await file.arrayBuffer();
   const bytes = Array.from(new Uint8Array(buffer));
   const relativePath = await invoke("save_image", {
@@ -1314,17 +1786,10 @@ function setupDragDrop() {
 
     for (const file of files) {
       if (file.name.match(/\.(md|markdown|txt)$/i)) {
-        // Markdown file: open it
+        // Markdown file: open it in a new tab. The browser sandbox gives no
+        // real path, so it lands as an Untitled tab carrying the dropped name.
         const text = await file.text();
-        setContent(editor, text);
-        currentFile = null;
-        currentFileMtime = null;
-        await invoke("set_current_file", { path: null });
-        statusFile.textContent = file.name;
-        isModified = false;
-        statusModified.classList.add("hidden");
-        updatePreview(text);
-        refreshEmptyMascot();
+        openInNewTab({ content: text, title: file.name });
         return; // Only open one markdown file
       } else if (file.name.match(IMAGE_EXTENSIONS)) {
         // Image file: save to images/ and insert reference
