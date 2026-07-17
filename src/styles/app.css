@@ -842,3 +842,32 @@ body.font-opendyslexic .cm-gutters {
   color: var(--text-secondary);
   white-space: pre-wrap;
 }
+
+/* Emoji autocomplete popup (see emoji.js). Themed to match the app rather
+   than CodeMirror's stock light tooltip so it reads well in night mode. */
+.cm-tooltip.cm-tooltip-autocomplete {
+  border: 1px solid var(--border-color);
+  background: var(--dialog-bg);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.cm-tooltip-autocomplete > ul {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  max-height: 16em;
+}
+.cm-tooltip-autocomplete > ul > li {
+  padding: 3px 10px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--accent-color);
+  color: #fff;
+}
+/* The label is "<glyph><em-space>:code:" — nudge the glyph up a touch so the
+   emoji and the shortcode text sit on the same baseline. */
+.cm-tooltip-autocomplete .cm-completionLabel {
+  font-size: 15px;
+}

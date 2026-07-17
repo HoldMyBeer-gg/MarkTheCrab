@@ -8,6 +8,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { syntaxHighlighting, defaultHighlightStyle, HighlightStyle, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { spellcheckExtension } from "./spellcheck.js";
+import { emojiCompletion } from "./emoji.js";
 
 // Override: the stock defaultHighlightStyle underlines anything tagged as a
 // heading, and lezer-markdown also tags table-header cells as headings —
@@ -22,6 +23,7 @@ const wordWrapCompartment = new Compartment();
 const fontSizeCompartment = new Compartment();
 const fontFamilyCompartment = new Compartment();
 const spellcheckCompartment = new Compartment();
+const emojiCompartment = new Compartment();
 const readOnlyCompartment = new Compartment();
 
 const fontSizeTheme = (size) =>
@@ -52,6 +54,7 @@ const editorConfig = {
   fontSize: 14,
   fontFamily: "",
   spellcheck: true,
+  emoji: true,
 };
 
 // Handlers are global (the single view drives the status bar / preview).
@@ -84,6 +87,7 @@ function buildExtensions() {
     fontFamilyCompartment.of(fontFamilyTheme(editorConfig.fontFamily)),
     nativeSpellcheckOff,
     spellcheckCompartment.of(editorConfig.spellcheck ? spellcheckExtension() : []),
+    emojiCompartment.of(editorConfig.emoji ? emojiCompletion() : []),
     themeCompartment.of(themeExtension()),
     readOnlyCompartment.of(EditorState.readOnly.of(false)),
     markdown({ base: markdownLanguage, codeLanguages: languages }),
@@ -132,6 +136,7 @@ export function activateState(view, state) {
       fontSizeCompartment.reconfigure(fontSizeTheme(editorConfig.fontSize)),
       fontFamilyCompartment.reconfigure(fontFamilyTheme(editorConfig.fontFamily)),
       spellcheckCompartment.reconfigure(editorConfig.spellcheck ? spellcheckExtension() : []),
+      emojiCompartment.reconfigure(editorConfig.emoji ? emojiCompletion() : []),
       themeCompartment.reconfigure(themeExtension()),
     ],
   });
@@ -189,6 +194,15 @@ export function setSpellcheck(view, enabled) {
   view.dispatch({
     effects: spellcheckCompartment.reconfigure(
       enabled ? spellcheckExtension() : []
+    ),
+  });
+}
+
+export function setEmoji(view, enabled) {
+  editorConfig.emoji = enabled;
+  view.dispatch({
+    effects: emojiCompartment.reconfigure(
+      enabled ? emojiCompletion() : []
     ),
   });
 }

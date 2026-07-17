@@ -1,6 +1,6 @@
 {
   "productName": "MarkTheCrab",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "identifier": "gg.holdmybeer.markthecrab",
   "build": {
     "beforeDevCommand": "npm run build",

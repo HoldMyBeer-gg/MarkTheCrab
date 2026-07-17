@@ -65,6 +65,34 @@ pub fn get_credits() -> String {
     markdown_core::credits()
 }
 
+/// Open the operating system's native emoji / character picker.
+///
+/// macOS exposes this directly (`orderFrontCharacterPalette:` — the panel
+/// Cmd+Ctrl+Space summons), so we can give the user a click-to-open button.
+/// Other platforms have no dependable way to raise their picker from a
+/// webview, so this reports back and the frontend falls back to the built-in
+/// `:shortcode` completion, which covers every platform anyway.
+#[tauri::command]
+pub fn open_emoji_picker(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        app.run_on_main_thread(|| {
+            use objc2::MainThreadMarker;
+            use objc2_app_kit::NSApplication;
+            if let Some(mtm) = MainThreadMarker::new() {
+                let ns_app = NSApplication::sharedApplication(mtm);
+                ns_app.orderFrontCharacterPalette(None);
+            }
+        })
+        .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+        Err("The native emoji picker is only available on macOS".to_string())
+    }
+}
+
 #[tauri::command]
 pub fn load_settings(state: State<AppState>) -> Settings {
     let settings = state.settings.lock().unwrap();
@@ -104,6 +132,7 @@ pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<
         }
         "rtl" => settings.rtl = value == "true",
         "spellcheck" => settings.spellcheck = value == "true",
+        "emoji" => settings.emoji = value == "true",
         "show_mascot" => settings.show_mascot = value == "true",
         "mascot_animations" => settings.mascot_animations = value == "true",
         _ => return Err(format!("Unknown setting: {key}")),

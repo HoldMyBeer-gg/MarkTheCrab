@@ -87,6 +87,7 @@ pub fn run() {
             commands::stat_mtime,
             commands::write_file_with_mtime,
             commands::get_credits,
+            commands::open_emoji_picker,
             commands::confirm_close,
             commands::quit_app,
             commands::new_window,

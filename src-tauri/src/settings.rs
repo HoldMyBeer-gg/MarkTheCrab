@@ -22,6 +22,8 @@ pub struct Settings {
     pub window_height: u32,
     pub spellcheck: bool,
     #[serde(default = "default_true")]
+    pub emoji: bool,
+    #[serde(default = "default_true")]
     pub show_mascot: bool,
     #[serde(default = "default_true")]
     pub mascot_animations: bool,
@@ -51,6 +53,7 @@ impl Default for Settings {
             window_width: 1200,
             window_height: 800,
             spellcheck: true,
+            emoji: true,
             show_mascot: true,
             mascot_animations: true,
         }

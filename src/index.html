@@ -58,6 +58,9 @@
       </button>
       <button data-action="hr" title="Horizontal Rule (Ctrl+H)" aria-label="Insert horizontal rule"><span aria-hidden="true">―</span></button>
       <button data-action="code" title="Code Block" aria-label="Insert code block"><span aria-hidden="true">{ }</span></button>
+      <button data-action="emoji" title="Insert emoji" aria-label="Insert emoji">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M8 14a4 4 0 0 0 8 0"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+      </button>
     </div>
     <div class="toolbar-separator" role="separator" aria-orientation="vertical"></div>
     <div class="toolbar-group" role="group" aria-label="Lists">
@@ -248,12 +251,19 @@
         <div class="settings-label">Show toolbar</div>
         <button type="button" id="settings-show-toolbar" class="toggle" role="switch" aria-checked="true" aria-label="Show toolbar"><span class="toggle-thumb"></span></button>
       </div>
-      <div class="settings-row settings-row-last">
+      <div class="settings-row">
         <div class="settings-label-group">
           <div class="settings-label">Spell check</div>
           <div class="settings-hint">Underline misspellings in the editor</div>
         </div>
         <button type="button" id="settings-spellcheck" class="toggle" role="switch" aria-checked="true" aria-label="Spell check"><span class="toggle-thumb"></span></button>
+      </div>
+      <div class="settings-row settings-row-last">
+        <div class="settings-label-group">
+          <div class="settings-label">Emoji</div>
+          <div class="settings-hint">Type <code>:crab:</code> or <code>:)</code> and tab-complete to 🦀</div>
+        </div>
+        <button type="button" id="settings-emoji" class="toggle" role="switch" aria-checked="true" aria-label="Emoji shortcodes"><span class="toggle-thumb"></span></button>
       </div>
     </section>
 

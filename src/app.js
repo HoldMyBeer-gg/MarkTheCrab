@@ -1,4 +1,4 @@
-import { createEditor, createDocState, activateState, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
+import { createEditor, createDocState, activateState, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, setEmoji, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
 import hljs from "./hljs-setup.js";
 import { Mascot } from "./mascot.js";
 
@@ -314,6 +314,7 @@ function applySettings() {
   setWordWrap(editor, settings.word_wrap);
   setFontSize(editor, settings.font_size);
   setSpellcheck(editor, settings.spellcheck !== false);
+  setEmoji(editor, settings.emoji !== false);
 
   if (settings.night_mode) {
     document.body.classList.add("night-mode");
@@ -1318,6 +1319,7 @@ function setupToolbar() {
     table: () => document.getElementById("table-dialog").showModal(),
     hr: () => insertAtCursor(editor, "\n\n---\n\n"),
     code: () => wrapSelection(editor, "```\n", "\n```"),
+    emoji: openEmojiPicker,
     ul: () => insertAtLineStart(editor, "- "),
     ol: () => insertAtLineStart(editor, "1. "),
     checklist: () => insertAtLineStart(editor, "- [ ] "),
@@ -1653,6 +1655,10 @@ function setupSettingsDialog() {
     settings.spellcheck = on;
     setSpellcheck(editor, on);
   });
+  bindToggle("settings-emoji", "emoji", (on) => {
+    settings.emoji = on;
+    setEmoji(editor, on);
+  });
   bindToggle("settings-show-mascot", "show_mascot", (on) => {
     settings.show_mascot = on;
     Mascot.configure({ enabled: on });
@@ -1665,6 +1671,18 @@ function setupSettingsDialog() {
 
   document.getElementById("settings-close").onclick = () => dialog.close();
   document.getElementById("settings-done").onclick = () => dialog.close();
+}
+
+// Emoji button: raise the OS emoji picker where we can (macOS), otherwise
+// just return focus to the editor — the `:shortcode` / `:)` completion is the
+// cross-platform way in and works everywhere regardless.
+async function openEmojiPicker() {
+  editor.focus();
+  try {
+    await invoke("open_emoji_picker");
+  } catch {
+    // No native picker here; the in-editor completion covers it.
+  }
 }
 
 // Bind a button[role=switch] to a boolean setting. `apply` runs the
@@ -1695,6 +1713,7 @@ function syncSettingsDialog() {
   set("settings-line-numbers", settings.line_numbers !== false);
   set("settings-show-toolbar", settings.show_toolbar !== false);
   set("settings-spellcheck", settings.spellcheck !== false);
+  set("settings-emoji", settings.emoji !== false);
   set("settings-show-mascot", settings.show_mascot !== false);
   set("settings-mascot-animations", settings.mascot_animations !== false);
 }

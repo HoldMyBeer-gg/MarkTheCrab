@@ -1,6 +1,6 @@
 [package]
 name = "markthecrab"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 
 # The app logic lives in a library so mobile targets (iOS/Android) can link
@@ -20,6 +20,13 @@ serde_json = "1"
 toml = "0.8"
 dirs = "6"
 markdown-core = { path = "../crates/markdown-core", features = ["simd"] }
+
+# macOS-only: raise the native emoji/character picker from a Tauri command.
+# Versions are pinned to what Tauri already resolves so no extra crates are
+# pulled into the build.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
