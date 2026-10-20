@@ -1,4 +1,4 @@
-import { createEditor, createDocState, activateState, setContent, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, setEmoji, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
+import { createEditor, createDocState, activateState, setContent, replaceContentKeepCursor, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, setEmoji, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
 import hljs from "./hljs-setup.js";
 import { Mascot } from "./mascot.js";
 
@@ -871,12 +871,22 @@ function cycleTab(dir) {
 }
 
 async function closeTab(id) {
-  const idx = tabs.findIndex((t) => t.id === id);
-  if (idx === -1) return;
+  if (!tabs.some((t) => t.id === id)) return;
 
   // Bring the tab to the front so the discard prompt is about a visible doc.
   if (id !== activeTabId) activateTab(id);
-  if (!(await confirmDiscardUnsaved())) return;
+  externalCheckPaused++;
+  let discard;
+  try {
+    discard = await confirmDiscardUnsaved();
+  } finally {
+    externalCheckPaused--;
+  }
+  if (!discard) return;
+  // Tabs may have changed while the prompt was up; re-find by id.
+  const idx = tabs.findIndex((t) => t.id === id);
+  if (idx === -1) return;
+  if (id !== activeTabId) activateTab(id);
 
   tabs.splice(idx, 1);
   if (tabs.length === 0) {
@@ -994,7 +1004,11 @@ async function openFile() {
     ],
   });
   if (!path) return;
-  await loadFile(path);
+  try {
+    await loadFile(path);
+  } catch (e) {
+    await message(`Couldn't open file: ${e}`, { title: "Open failed", kind: "error" });
+  }
 }
 
 async function loadFile(path) {
@@ -1012,7 +1026,10 @@ async function loadFile(path) {
   // leaving an empty tab behind (covers the very first open after launch).
   const cur = activeTab();
   if (cur && !cur.file && !cur.isModified && getContent(editor).trim() === "") {
-    setContent(editor, content);
+    suppressChange = true;
+    activateState(editor, createDocState(content));
+    suppressChange = false;
+    cur.state = editor.state;
     currentFile = path;
     currentFileMtime = mtime;
     cur.file = path;
@@ -1090,25 +1107,33 @@ async function saveFile() {
     return saveFileAs();
   }
 
-  // External-change check: if the on-disk mtime is newer than what we
-  // loaded, someone else edited the file while it was open. Don't
-  // silently clobber.
-  if (currentFileMtime != null) {
-    const diskMtime = await invoke("stat_mtime", { path: currentFile });
-    if (diskMtime != null && diskMtime > currentFileMtime) {
-      const overwrite = await ask(
-        "This file was modified outside MarkTheCrab since you opened it. Overwrite the external changes?",
-        { title: "External changes", kind: "warning", okLabel: "Overwrite", cancelLabel: "Cancel" }
-      );
-      if (!overwrite) return;
+  externalCheckPaused++;
+  try {
+    // External-change check: if the on-disk mtime is newer than what we
+    // loaded, someone else edited the file while it was open. Don't
+    // silently clobber.
+    if (currentFileMtime != null) {
+      const diskMtime = await invoke("stat_mtime", { path: currentFile });
+      if (diskMtime != null && diskMtime > currentFileMtime) {
+        const overwrite = await ask(
+          "This file was modified outside MarkTheCrab since you opened it. Overwrite the external changes?",
+          { title: "External changes", kind: "warning", okLabel: "Overwrite", cancelLabel: "Cancel" }
+        );
+        if (!overwrite) return;
+      }
     }
-  }
 
-  const content = getContent(editor);
-  currentFileMtime = await invoke("write_file_with_mtime", { path: currentFile, content });
-  const t = activeTab();
-  if (t) t.mtime = currentFileMtime;
-  setActiveModified(false);
+    const content = getContent(editor);
+    currentFileMtime = await invoke("write_file_with_mtime", { path: currentFile, content });
+    const t = activeTab();
+    if (t) { t.mtime = currentFileMtime; t.ignoredMtime = undefined; }
+    setActiveModified(false);
+  } catch (e) {
+    await message(`Couldn't save: ${e}`, { title: "Save failed", kind: "error" });
+    return;
+  } finally {
+    externalCheckPaused--;
+  }
   Mascot.flash("#mascot-slot", "celebrating", 1200, 32);
   await refreshRecentFiles();
 }
@@ -1131,9 +1156,18 @@ async function saveFileAs() {
   statusFile.textContent = path.split(/[\\/]/).pop();
   const t = activeTab();
   if (t) { t.file = path; t.mtime = null; t.title = null; }
+  // If another tab already has this path open it is about to be overwritten;
+  // drop it so one file never lives in two tabs.
+  dropOtherTabsWithPath(path, t);
   renderTabs();
   await invoke("set_current_file", { path });
   return saveFile();
+}
+
+function dropOtherTabsWithPath(path, keep) {
+  for (const other of tabs.filter((x) => x !== keep && x.file === path)) {
+    tabs.splice(tabs.indexOf(other), 1);
+  }
 }
 
 // iOS save-as. There's no native save path picker, and the sandbox only
@@ -1161,6 +1195,7 @@ async function saveFileAsMobile() {
   statusFile.textContent = finalName;
   const t = activeTab();
   if (t) { t.file = path; t.mtime = null; t.title = null; }
+  dropOtherTabsWithPath(path, t);
   renderTabs();
   await invoke("set_current_file", { path });
   return saveFile();
@@ -1862,33 +1897,39 @@ function setupClipboardPaste() {
 // isn't repeated on every focus, but save still warns before overwriting.
 const EXTERNAL_POLL_MS = 3000;
 let externalCheckRunning = false;
+// Raised while save/open/close are mid-flight or showing their own dialog, so
+// the focus event from a closing native sheet can't start a check that races
+// the write (and asks you to reload the file you just saved).
+let externalCheckPaused = 0;
 
 async function checkExternalChanges() {
-  if (externalCheckRunning || isBrowser) return;
+  if (externalCheckRunning || externalCheckPaused > 0 || isBrowser) return;
   externalCheckRunning = true;
   try {
     for (const t of [...tabs]) {
       if (!t.file || t.mtime == null) continue;
-      const isActive = t.id === activeTabId;
-      const knownMtime = isActive ? currentFileMtime : t.mtime;
       let diskMtime;
       try {
         diskMtime = await invoke("stat_mtime", { path: t.file });
       } catch (_) {
         continue;
       }
-      // Deleted or unchanged (or already declined at this mtime): nothing to do.
-      if (diskMtime == null || diskMtime <= knownMtime || diskMtime === t.ignoredMtime) continue;
-      // The tab may have been closed or saved while we awaited.
+      // Anything can have happened during the await (tab switch, save,
+      // close), so decide from the tab's fields only, after syncing the
+      // active tab's mirror globals back into it.
+      if (externalCheckPaused > 0) return;
       if (!tabs.includes(t)) continue;
+      saveActiveTabState();
+      // Deleted or unchanged (or already declined at this mtime): nothing to do.
+      if (diskMtime == null || diskMtime <= t.mtime || diskMtime === t.ignoredMtime) continue;
 
-      const dirty = isActive ? isModified : t.isModified;
-      if (dirty) {
-        if (!isActive) activateTab(t.id);
+      if (t.isModified) {
+        if (t.id !== activeTabId) activateTab(t.id);
         const reload = await ask(
           `"${tabTitle(t)}" was modified outside MarkTheCrab and you have unsaved changes. Reload from disk and lose your changes?`,
           { title: "External changes", kind: "warning", okLabel: "Reload", cancelLabel: "Keep mine" }
         );
+        if (!tabs.includes(t)) continue;
         if (!reload) { t.ignoredMtime = diskMtime; continue; }
       }
       await reloadTabFromDisk(t);
@@ -1905,12 +1946,13 @@ async function reloadTabFromDisk(t) {
   } catch (_) {
     return;
   }
+  if (!tabs.includes(t)) return;
   t.ignoredMtime = undefined;
   if (t.id === activeTabId) {
     const scroller = editorScroller();
     const scrollTop = scroller ? scroller.scrollTop : 0;
     suppressChange = true;
-    setContent(editor, content);
+    replaceContentKeepCursor(editor, content);
     suppressChange = false;
     if (scroller) scroller.scrollTop = scrollTop;
     currentFileMtime = mtime;

@@ -307,6 +307,15 @@ pub fn save_image(
         None => dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")),
     };
 
+    // The webview supplies the name; keep only its final component so a
+    // crafted "../x" can't write outside images/.
+    let filename = Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| !n.is_empty() && *n != "." && *n != "..")
+        .ok_or_else(|| "invalid image filename".to_string())?
+        .to_string();
+
     let images_dir = base_dir.join("images");
     fs::create_dir_all(&images_dir).map_err(|e| e.to_string())?;
 

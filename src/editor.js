@@ -1,5 +1,5 @@
 import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightActiveLine, drawSelection, rectangularSelection, crosshairCursor, highlightSpecialChars } from "@codemirror/view";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState, EditorSelection, Compartment, Transaction } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { defaultKeymap, history, historyKeymap, indentWithTab, undo, redo } from "@codemirror/commands";
@@ -145,6 +145,17 @@ export function activateState(view, state) {
 export function setContent(view, content) {
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: content },
+  });
+}
+
+// Replace the whole document without it becoming an undo step and without
+// throwing the caret to the top: used when a file is reloaded from disk.
+export function replaceContentKeepCursor(view, content) {
+  const head = Math.min(view.state.selection.main.head, content.length);
+  view.dispatch({
+    changes: { from: 0, to: view.state.doc.length, insert: content },
+    selection: EditorSelection.cursor(head),
+    annotations: Transaction.addToHistory.of(false),
   });
 }
 

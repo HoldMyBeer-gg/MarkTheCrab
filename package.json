@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.1",
@@ -32,10 +32,10 @@
     "@tauri-apps/api": "^2.10.1",
     "codemirror": "^6.0.2",
     "dictionary-en-us": "^2.2.1",
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
-    "mermaid": "^11.14.0",
+    "mermaid": "^11.16.1",
     "nspell": "^2.1.5"
   }
 }
