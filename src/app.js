@@ -110,6 +110,9 @@ async function init() {
   // Set up clipboard image paste
   setupClipboardPaste();
 
+  // Notice files edited outside the app (on focus + slow poll)
+  setupExternalChangeWatch();
+
   // Guard window close against unsaved changes
   setupCloseGuard();
 
@@ -1848,6 +1851,90 @@ function setupClipboardPaste() {
     }
     // If no image data, let the default paste handle text
   });
+}
+
+// ────── EXTERNAL CHANGES ─────────────────────────────────────────
+// Save already refuses to clobber a file whose on-disk mtime moved, but that
+// only fires when you hit save. Check every file-backed tab when the window
+// regains focus (the moment you come back from the other editor) and on a
+// slow poll while focused. A clean tab reloads from disk silently; a dirty
+// tab asks which copy wins. Declining remembers that mtime so the question
+// isn't repeated on every focus, but save still warns before overwriting.
+const EXTERNAL_POLL_MS = 3000;
+let externalCheckRunning = false;
+
+async function checkExternalChanges() {
+  if (externalCheckRunning || isBrowser) return;
+  externalCheckRunning = true;
+  try {
+    for (const t of [...tabs]) {
+      if (!t.file || t.mtime == null) continue;
+      const isActive = t.id === activeTabId;
+      const knownMtime = isActive ? currentFileMtime : t.mtime;
+      let diskMtime;
+      try {
+        diskMtime = await invoke("stat_mtime", { path: t.file });
+      } catch (_) {
+        continue;
+      }
+      // Deleted or unchanged (or already declined at this mtime): nothing to do.
+      if (diskMtime == null || diskMtime <= knownMtime || diskMtime === t.ignoredMtime) continue;
+      // The tab may have been closed or saved while we awaited.
+      if (!tabs.includes(t)) continue;
+
+      const dirty = isActive ? isModified : t.isModified;
+      if (dirty) {
+        if (!isActive) activateTab(t.id);
+        const reload = await ask(
+          `"${tabTitle(t)}" was modified outside MarkTheCrab and you have unsaved changes. Reload from disk and lose your changes?`,
+          { title: "External changes", kind: "warning", okLabel: "Reload", cancelLabel: "Keep mine" }
+        );
+        if (!reload) { t.ignoredMtime = diskMtime; continue; }
+      }
+      await reloadTabFromDisk(t);
+    }
+  } finally {
+    externalCheckRunning = false;
+  }
+}
+
+async function reloadTabFromDisk(t) {
+  let content, mtime;
+  try {
+    [content, mtime] = await invoke("read_file_with_mtime", { path: t.file });
+  } catch (_) {
+    return;
+  }
+  t.ignoredMtime = undefined;
+  if (t.id === activeTabId) {
+    const scroller = editorScroller();
+    const scrollTop = scroller ? scroller.scrollTop : 0;
+    suppressChange = true;
+    setContent(editor, content);
+    suppressChange = false;
+    if (scroller) scroller.scrollTop = scrollTop;
+    currentFileMtime = mtime;
+    t.mtime = mtime;
+    setActiveModified(false);
+    updatePreview(content);
+    updateWordCountStatus();
+    updateCursorStatus();
+  } else {
+    t.state = createDocState(content);
+    t.mtime = mtime;
+    t.isModified = false;
+    renderTabs();
+  }
+}
+
+function setupExternalChangeWatch() {
+  window.addEventListener("focus", () => { checkExternalChanges(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") checkExternalChanges();
+  });
+  setInterval(() => {
+    if (document.hasFocus() && document.visibilityState === "visible") checkExternalChanges();
+  }, EXTERNAL_POLL_MS);
 }
 
 // Synchronized scrolling — source-map based.
