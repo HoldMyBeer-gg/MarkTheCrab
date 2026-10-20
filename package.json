@@ -1,6 +1,6 @@
 {
   "name": "markthecrab",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "private": true,
   "description": "A cross-platform markdown editor built with Tauri and Rust",
   "scripts": {
@@ -34,7 +34,7 @@
     "dictionary-en-us": "^2.2.1",
     "esbuild": "^0.28.1",
     "highlight.js": "^11.11.1",
-    "katex": "^0.16.45",
+    "katex": "^0.18.2",
     "mermaid": "^11.16.1",
     "nspell": "^2.1.5"
   }

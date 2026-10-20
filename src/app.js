@@ -132,10 +132,10 @@ async function init() {
   // Open file passed via CLI args, file-association double-click, or
   // `open foo.md` on macOS. Falls back to welcome dialog on first launch.
   const opened = await maybeOpenStartupFile();
-  if (!opened) maybeShowWelcome();
-
-  // Load tutorial or empty
-  updatePreview("");
+  if (!opened) {
+    maybeShowWelcome();
+    updatePreview("");
+  }
 }
 
 async function maybeOpenStartupFile() {
@@ -1036,6 +1036,8 @@ async function loadFile(path) {
     cur.mtime = mtime;
     cur.title = null;
     setActiveModified(false);
+    updateWordCountStatus();
+    updateCursorStatus();
     statusFile.textContent = path.split(/[\\/]/).pop();
     await invoke("set_current_file", { path });
     updatePreview(content);

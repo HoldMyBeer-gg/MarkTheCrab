@@ -747,7 +747,37 @@ fn postprocess_custom_html(_html: &str) -> String {
     _html.to_string()
 }
 
+/// Every id that reaches the preview is prefixed so document headings can't
+/// shadow the app's own elements (a "## Image Dialog" heading would otherwise
+/// become `#image-dialog` and break getElementById for the real dialog).
+/// Fragment links are rewritten to match, so TOC/footnote anchors still work
+/// both in the live preview and in exported HTML.
+pub const ID_PREFIX: &str = "user-content-";
+
+fn prefix_fragment_links(html: &str) -> String {
+    let needle = "href=\"#";
+    let skip = format!("{}{}", needle, ID_PREFIX);
+    let mut out = String::with_capacity(html.len() + 64);
+    let mut rest = html;
+    while let Some(i) = rest.find(needle) {
+        out.push_str(&rest[..i]);
+        if rest[i..].starts_with(&skip) {
+            out.push_str(needle);
+        } else {
+            out.push_str(needle);
+            out.push_str(ID_PREFIX);
+        }
+        rest = &rest[i + needle.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 fn sanitize_html(html: &str) -> String {
+    prefix_fragment_links(&sanitize_html_inner(html))
+}
+
+fn sanitize_html_inner(html: &str) -> String {
     ammonia::Builder::new()
         .add_tags(&[
             "mark",
@@ -811,7 +841,7 @@ fn sanitize_html(html: &str) -> String {
         .add_tag_attributes("code", &["class"])
         .add_tag_attributes("pre", &["class"])
         .add_tag_attributes("li", &["class"])
-        .add_tag_attributes("div", &["class"])
+        .add_tag_attributes("div", &["class", "id"])
         .add_tag_attributes("span", &["class"])
         // Inline images are embedded as `data:` URLs (iOS image insert, and
         // clipboard paste in the browser demo). `data` isn't in ammonia's
@@ -827,6 +857,7 @@ fn sanitize_html(html: &str) -> String {
             Some(value.into())
         })
         .link_rel(Some("noopener noreferrer"))
+        .id_prefix(Some(ID_PREFIX))
         .clean(html)
         .to_string()
 }
@@ -838,7 +869,7 @@ mod tests {
     #[test]
     fn test_basic_markdown() {
         let result = render_markdown("# Hello\n\nThis is **bold** and *italic*.");
-        assert!(result.contains("<h1 id=\"hello\">Hello</h1>"));
+        assert!(result.contains("<h1 id=\"user-content-hello\">Hello</h1>"));
         assert!(result.contains("<strong>bold</strong>"));
         assert!(result.contains("<em>italic</em>"));
     }
@@ -846,9 +877,9 @@ mod tests {
     #[test]
     fn test_heading_ids_are_unique() {
         let result = render_markdown("# Intro\n\n## Intro\n\n## Intro");
-        assert!(result.contains("id=\"intro\""));
-        assert!(result.contains("id=\"intro-1\""));
-        assert!(result.contains("id=\"intro-2\""));
+        assert!(result.contains("id=\"user-content-intro\""));
+        assert!(result.contains("id=\"user-content-intro-1\""));
+        assert!(result.contains("id=\"user-content-intro-2\""));
     }
 
     #[test]
@@ -856,20 +887,48 @@ mod tests {
         let md = "[TOC]\n\n# One\n\n## Sub\n\n# Two";
         let result = render_markdown(md);
         assert!(result.contains("<div class=\"toc\">"));
-        assert!(result.contains("href=\"#one\""));
-        assert!(result.contains("href=\"#sub\""));
-        assert!(result.contains("href=\"#two\""));
+        assert!(result.contains("href=\"#user-content-one\""));
+        assert!(result.contains("href=\"#user-content-sub\""));
+        assert!(result.contains("href=\"#user-content-two\""));
         // Sub should be nested inside One's <li>
-        let one_idx = result.find("href=\"#one\"").unwrap();
-        let sub_idx = result.find("href=\"#sub\"").unwrap();
-        let two_idx = result.find("href=\"#two\"").unwrap();
+        let one_idx = result.find("href=\"#user-content-one\"").unwrap();
+        let sub_idx = result.find("href=\"#user-content-sub\"").unwrap();
+        let two_idx = result.find("href=\"#user-content-two\"").unwrap();
         assert!(one_idx < sub_idx && sub_idx < two_idx);
+    }
+
+    #[test]
+    fn test_user_ids_cannot_shadow_app_elements() {
+        // A heading that slugifies to an app element id, and a raw-HTML
+        // heading naming one outright, must both come out prefixed.
+        let result = render_markdown("## Image Dialog\n\n<h1 id=\"settings-dialog\">x</h1>");
+        assert!(result.contains("id=\"user-content-image-dialog\""));
+        assert!(result.contains("id=\"user-content-settings-dialog\""));
+        assert!(!result.contains("id=\"image-dialog\""));
+        assert!(!result.contains("id=\"settings-dialog\""));
+    }
+
+    #[test]
+    fn test_footnote_links_follow_prefixed_ids() {
+        let result = render_markdown("Text.[^1]\n\n[^1]: Note.");
+        // Every fragment href must point at an id that exists in the output.
+        for (i, _) in result.match_indices("href=\"#") {
+            let rest = &result[i + 7..];
+            let target = &rest[..rest.find('"').unwrap()];
+            assert!(
+                result.contains(&format!("id=\"{}\"", target)),
+                "dangling fragment link #{} in {}",
+                target,
+                result
+            );
+        }
+        assert!(result.contains("href=\"#user-content-"));
     }
 
     #[test]
     fn test_slugify_handles_punctuation() {
         let result = render_markdown("## Hello, World!");
-        assert!(result.contains("id=\"hello-world\""));
+        assert!(result.contains("id=\"user-content-hello-world\""));
     }
 
     #[test]

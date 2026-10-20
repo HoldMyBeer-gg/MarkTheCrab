@@ -258,15 +258,34 @@ pub fn refresh_recent_menu() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn set_current_file(window: tauri::Window, state: State<AppState>, path: Option<String>) {
+pub fn set_current_file(
+    app: AppHandle,
+    window: tauri::Window,
+    state: State<AppState>,
+    path: Option<String>,
+) {
     {
         let mut current = state.current_file.lock().unwrap();
         current.insert(window.label().to_string(), path.clone());
     }
     if let Some(ref p) = path {
+        allow_asset_dir_for(&app, Path::new(p));
         let mut settings = state.settings.lock().unwrap();
         settings.add_recent_file(p);
         settings.save().ok();
+    }
+}
+
+/// The asset protocol scope starts at a few well-known user folders; opening
+/// a document extends it to that document's folder so relative and sibling
+/// images render, without exposing the whole disk to a crafted .md.
+fn allow_asset_dir_for(app: &AppHandle, file: &Path) {
+    use tauri::Manager;
+    if let Some(dir) = file.parent() {
+        if dir.as_os_str().is_empty() {
+            return;
+        }
+        app.asset_protocol_scope().allow_directory(dir, true).ok();
     }
 }
 
@@ -290,6 +309,7 @@ pub fn export_html(markdown_text: &str, styled: bool, theme: &str, custom_css: &
 /// Returns the relative path suitable for embedding in markdown.
 #[tauri::command]
 pub fn save_image(
+    app: AppHandle,
     window: tauri::Window,
     state: State<AppState>,
     image_data: Vec<u8>,
@@ -306,6 +326,7 @@ pub fn save_image(
             .unwrap_or_else(|| PathBuf::from(".")),
         None => dirs::document_dir().unwrap_or_else(|| PathBuf::from(".")),
     };
+    allow_asset_dir_for(&app, &base_dir.join("images").join("x"));
 
     // The webview supplies the name; keep only its final component so a
     // crafted "../x" can't write outside images/.
