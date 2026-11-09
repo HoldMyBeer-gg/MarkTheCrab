@@ -15,14 +15,14 @@ pub fn new_window<R: Runtime>(app: &AppHandle<R>) {
     crate::commands::QUITTING.store(false, Ordering::SeqCst);
     let n = WINDOW_COUNTER.fetch_add(1, Ordering::SeqCst);
     let label = format!("main-{n}");
-    if let Err(e) =
-        tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App("index.html".into()))
-            .title("MarkTheCrab")
-            .inner_size(1308.0, 800.0)
-            .min_inner_size(950.0, 400.0)
-            .build()
+    match tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::App("index.html".into()))
+        .title("MarkTheCrab")
+        .inner_size(1308.0, 800.0)
+        .min_inner_size(950.0, 400.0)
+        .build()
     {
-        eprintln!("failed to open new window {label}: {e}");
+        Ok(window) => crate::gamescope::fit_window(&window),
+        Err(e) => eprintln!("failed to open new window {label}: {e}"),
     }
 }
 

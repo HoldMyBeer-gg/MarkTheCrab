@@ -1,5 +1,6 @@
 mod commands;
 mod fonts;
+mod gamescope;
 #[cfg(desktop)]
 mod menu;
 mod settings;
@@ -107,6 +108,9 @@ pub fn run() {
             .setup(|app| {
                 let handle = app.handle().clone();
                 menu::install(&handle)?;
+                for window in tauri::Manager::webview_windows(app).values() {
+                    gamescope::fit_window(window);
+                }
                 app.on_menu_event(move |app, event| {
                     menu::handle_event(app, event.id().as_ref());
                 });
