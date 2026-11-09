@@ -1,4 +1,4 @@
-import { createEditor, createDocState, activateState, setContent, replaceContentKeepCursor, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, setEmoji, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
+import { createEditor, createDocState, activateState, reloadedDocState, getContent, setNightMode, setLineNumbers, setWordWrap, setFontSize, setFontFamily, setSpellcheck, setEmoji, wrapSelection, insertAtCursor, insertAtLineStart, getWordCount, editorUndo, editorRedo, openFind } from "./editor.js";
 import hljs from "./hljs-setup.js";
 import { Mascot } from "./mascot.js";
 
@@ -7,7 +7,14 @@ window.hljs = hljs;
 
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
-const { open, save, message, ask } = dialog;
+import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
+
+// Raised while a save/open is mid-flight or any native dialog is up, so the
+// focus event from a closing sheet can't start an external-change check that
+// races the write (and asks you to reload the file you just saved). Every
+// dialog below goes through the gate.
+const watchGate = createPauseGate();
+const { open, save, message, ask } = wrapDialogs(dialog, watchGate);
 
 // State
 let editor;
@@ -875,14 +882,7 @@ async function closeTab(id) {
 
   // Bring the tab to the front so the discard prompt is about a visible doc.
   if (id !== activeTabId) activateTab(id);
-  externalCheckPaused++;
-  let discard;
-  try {
-    discard = await confirmDiscardUnsaved();
-  } finally {
-    externalCheckPaused--;
-  }
-  if (!discard) return;
+  if (!(await confirmDiscardUnsaved())) return;
   // Tabs may have changed while the prompt was up; re-find by id.
   const idx = tabs.findIndex((t) => t.id === id);
   if (idx === -1) return;
@@ -1011,7 +1011,11 @@ async function openFile() {
   }
 }
 
-async function loadFile(path) {
+function loadFile(path) {
+  return watchGate.during(() => loadFileNow(path));
+}
+
+async function loadFileNow(path) {
   // Already open? Just switch to that tab.
   const existing = tabs.find((t) => t.file === path);
   if (existing) {
@@ -1024,26 +1028,16 @@ async function loadFile(path) {
 
   // If the active tab is a pristine empty Untitled, load into it rather than
   // leaving an empty tab behind (covers the very first open after launch).
+  saveActiveTabState();
   const cur = activeTab();
   if (cur && !cur.file && !cur.isModified && getContent(editor).trim() === "") {
-    suppressChange = true;
-    activateState(editor, createDocState(content));
-    suppressChange = false;
-    cur.state = editor.state;
-    currentFile = path;
-    currentFileMtime = mtime;
-    cur.file = path;
-    cur.mtime = mtime;
-    cur.title = null;
-    setActiveModified(false);
-    updateWordCountStatus();
-    updateCursorStatus();
-    statusFile.textContent = path.split(/[\\/]/).pop();
-    await invoke("set_current_file", { path });
-    updatePreview(content);
-    renderTabs();
+    Object.assign(cur, {
+      file: path, mtime, title: null, isModified: false, scrollTop: 0,
+      state: createDocState(content),
+    });
+    activeTabId = null; // force mountTab to perform the swap
+    mountTab(cur);
     await refreshRecentFiles();
-    refreshEmptyMascot();
     return;
   }
 
@@ -1104,72 +1098,101 @@ async function rebaseMobilePath(path) {
   }
 }
 
-async function saveFile() {
-  if (!currentFile) {
-    return saveFileAs();
-  }
+// The live text of a tab: the editor for the active one, its stored state
+// otherwise.
+function tabContent(t) {
+  return t.id === activeTabId ? getContent(editor) : t.state.doc.toString();
+}
 
-  externalCheckPaused++;
-  try {
-    // External-change check: if the on-disk mtime is newer than what we
-    // loaded, someone else edited the file while it was open. Don't
-    // silently clobber.
-    if (currentFileMtime != null) {
-      const diskMtime = await invoke("stat_mtime", { path: currentFile });
-      if (diskMtime != null && diskMtime > currentFileMtime) {
-        const overwrite = await ask(
+const writeFile = (path, content) => invoke("write_file_with_mtime", { path, content });
+const statMtime = (path) => invoke("stat_mtime", { path });
+
+async function saveFile() {
+  saveActiveTabState();
+  const t = activeTab();
+  if (!t) return;
+  if (!t.file) return saveFileAs();
+
+  // The tab, its path and content are captured up front (inside saveTab), so
+  // switching tabs mid-save writes the tab Cmd+S was pressed in.
+  await watchGate.during(async () => {
+    let result;
+    try {
+      result = await saveTab(t, {
+        contentOf: tabContent,
+        statMtime,
+        writeFile,
+        confirmOverwrite: () => ask(
           "This file was modified outside MarkTheCrab since you opened it. Overwrite the external changes?",
           { title: "External changes", kind: "warning", okLabel: "Overwrite", cancelLabel: "Cancel" }
-        );
-        if (!overwrite) return;
-      }
+        ),
+      });
+    } catch (e) {
+      await message(`Couldn't save: ${e}`, { title: "Save failed", kind: "error" });
+      return;
     }
-
-    const content = getContent(editor);
-    currentFileMtime = await invoke("write_file_with_mtime", { path: currentFile, content });
-    const t = activeTab();
-    if (t) { t.mtime = currentFileMtime; t.ignoredMtime = undefined; }
-    setActiveModified(false);
-  } catch (e) {
-    await message(`Couldn't save: ${e}`, { title: "Save failed", kind: "error" });
-    return;
-  } finally {
-    externalCheckPaused--;
-  }
-  Mascot.flash("#mascot-slot", "celebrating", 1200, 32);
-  await refreshRecentFiles();
+    if (result.saved) await afterSave(t);
+  });
 }
 
 async function saveFileAs() {
   if (isMobile) return saveFileAsMobile();
+  const t = activeTab();
   const path = await save({
     filters: [
       { name: "Markdown", extensions: ["md"] },
       { name: "All Files", extensions: ["*"] },
     ],
-    defaultPath: currentFile || "untitled.md",
+    defaultPath: t?.file || "untitled.md",
   });
   if (!path) return;
-
-  // Fresh destination — the OS dialog handled the overwrite prompt,
-  // so suppress the external-change check for this first write.
-  currentFile = path;
-  currentFileMtime = null;
-  statusFile.textContent = path.split(/[\\/]/).pop();
-  const t = activeTab();
-  if (t) { t.file = path; t.mtime = null; t.title = null; }
-  // If another tab already has this path open it is about to be overwritten;
-  // drop it so one file never lives in two tabs.
-  dropOtherTabsWithPath(path, t);
-  renderTabs();
-  await invoke("set_current_file", { path });
-  return saveFile();
+  return saveTabToPath(t, path);
 }
 
-function dropOtherTabsWithPath(path, keep) {
-  for (const other of tabs.filter((x) => x !== keep && x.file === path)) {
-    tabs.splice(tabs.indexOf(other), 1);
+// Save `t` under a new path. The OS dialog handled the overwrite prompt for
+// the file itself; another tab holding that path is closed, after asking if
+// it has unsaved edits. Nothing changes if the write fails.
+async function saveTabToPath(t, path) {
+  if (!t || !tabs.includes(t)) return;
+  saveActiveTabState();
+  await watchGate.during(async () => {
+    let result;
+    try {
+      result = await saveTabAs(t, path, {
+        tabs,
+        contentOf: tabContent,
+        writeFile,
+        confirmReplaceDirty: (dirty) => ask(
+          `"${tabTitle(dirty[0])}" is open in another tab with unsaved changes. Saving here overwrites that file and closes the tab, losing those changes.`,
+          { title: "Unsaved changes", kind: "warning", okLabel: "Replace", cancelLabel: "Cancel" }
+        ),
+      });
+    } catch (e) {
+      await message(`Couldn't save: ${e}`, { title: "Save failed", kind: "error" });
+      return;
+    }
+    if (!result.saved) return;
+    // If the user had switched to the tab that just got replaced, show `t`.
+    if (!activeTab()) {
+      activeTabId = null;
+      mountTab(t);
+    }
+    await afterSave(t);
+  });
+}
+
+// Mirror a just-saved tab into the active-tab globals and the UI.
+async function afterSave(t) {
+  if (t.id === activeTabId) {
+    currentFile = t.file;
+    currentFileMtime = t.mtime;
+    setActiveModified(t.isModified);
+    statusFile.textContent = tabTitle(t);
+    invoke("set_current_file", { path: t.file });
   }
+  renderTabs();
+  Mascot.flash("#mascot-slot", "celebrating", 1200, 32);
+  await refreshRecentFiles();
 }
 
 // iOS save-as. There's no native save path picker, and the sandbox only
@@ -1178,7 +1201,8 @@ function dropOtherTabsWithPath(path, keep) {
 // then write into Documents. Subsequent Ctrl/Cmd+S writes back to that
 // absolute path, which stays inside the sandbox.
 async function saveFileAsMobile() {
-  const suggested = currentFile ? currentFile.split("/").pop() : "untitled.md";
+  const t = activeTab();
+  const suggested = t?.file ? t.file.split("/").pop() : "untitled.md";
   const name = await promptFilename(suggested);
   if (!name) return;
   const finalName = /\.\w+$/.test(name) ? name : `${name}.md`;
@@ -1191,16 +1215,7 @@ async function saveFileAsMobile() {
     return;
   }
   const path = `${dir.replace(/\/+$/, "")}/${finalName}`;
-
-  currentFile = path;
-  currentFileMtime = null;
-  statusFile.textContent = finalName;
-  const t = activeTab();
-  if (t) { t.file = path; t.mtime = null; t.title = null; }
-  dropOtherTabsWithPath(path, t);
-  renderTabs();
-  await invoke("set_current_file", { path });
-  return saveFile();
+  return saveTabToPath(t, path);
 }
 
 // Editable filename prompt for platforms without a usable native save
@@ -1899,28 +1914,24 @@ function setupClipboardPaste() {
 // isn't repeated on every focus, but save still warns before overwriting.
 const EXTERNAL_POLL_MS = 3000;
 let externalCheckRunning = false;
-// Raised while save/open/close are mid-flight or showing their own dialog, so
-// the focus event from a closing native sheet can't start a check that races
-// the write (and asks you to reload the file you just saved).
-let externalCheckPaused = 0;
 
 async function checkExternalChanges() {
-  if (externalCheckRunning || externalCheckPaused > 0 || isBrowser) return;
+  if (externalCheckRunning || watchGate.paused || isBrowser) return;
   externalCheckRunning = true;
   try {
-    for (const t of [...tabs]) {
-      if (!t.file || t.mtime == null) continue;
-      let diskMtime;
-      try {
-        diskMtime = await invoke("stat_mtime", { path: t.file });
-      } catch (_) {
-        continue;
-      }
-      // Anything can have happened during the await (tab switch, save,
-      // close), so decide from the tab's fields only, after syncing the
-      // active tab's mirror globals back into it.
-      if (externalCheckPaused > 0) return;
-      if (!tabs.includes(t)) continue;
+    saveActiveTabState();
+    const watched = tabs.filter((t) => t.file && t.mtime != null);
+    const paths = watched.map((t) => t.file);
+    const diskMtimes = await statAll(watched, statMtime);
+
+    for (let i = 0; i < watched.length; i++) {
+      const t = watched[i];
+      const diskMtime = diskMtimes[i];
+      // Anything can have happened since the stats were sent (tab switch,
+      // save, Save As, close), so decide from the tab's fields only, after
+      // syncing the active tab's mirror globals back into it.
+      if (watchGate.paused) return;
+      if (!tabs.includes(t) || t.file !== paths[i]) continue;
       saveActiveTabState();
       // Deleted or unchanged (or already declined at this mtime): nothing to do.
       if (diskMtime == null || diskMtime <= t.mtime || diskMtime === t.ignoredMtime) continue;
@@ -1934,41 +1945,47 @@ async function checkExternalChanges() {
         if (!tabs.includes(t)) continue;
         if (!reload) { t.ignoredMtime = diskMtime; continue; }
       }
-      await reloadTabFromDisk(t);
+      // Skipped if the tab is edited, closed, or a save starts during the
+      // read; the next check picks it up again.
+      await reloadTab(t, {
+        contentOf: tabContent,
+        readFile: (path) => invoke("read_file_with_mtime", { path }),
+        isPaused: () => watchGate.paused,
+        isOpen: (x) => tabs.includes(x),
+        apply: applyReload,
+      });
     }
   } finally {
     externalCheckRunning = false;
   }
 }
 
-async function reloadTabFromDisk(t) {
-  let content, mtime;
-  try {
-    [content, mtime] = await invoke("read_file_with_mtime", { path: t.file });
-  } catch (_) {
+// Swap in freshly read content. The new state has its own undo history, so
+// Cmd+Z can't replay edits made to the old content.
+function applyReload(t, content, mtime) {
+  t.ignoredMtime = undefined;
+  t.mtime = mtime;
+  t.isModified = false;
+  if (t.id !== activeTabId) {
+    t.state = reloadedDocState(t.state, content);
+    renderTabs();
     return;
   }
-  if (!tabs.includes(t)) return;
-  t.ignoredMtime = undefined;
-  if (t.id === activeTabId) {
-    const scroller = editorScroller();
-    const scrollTop = scroller ? scroller.scrollTop : 0;
-    suppressChange = true;
-    replaceContentKeepCursor(editor, content);
-    suppressChange = false;
-    if (scroller) scroller.scrollTop = scrollTop;
-    currentFileMtime = mtime;
-    t.mtime = mtime;
-    setActiveModified(false);
-    updatePreview(content);
-    updateWordCountStatus();
-    updateCursorStatus();
-  } else {
-    t.state = createDocState(content);
-    t.mtime = mtime;
-    t.isModified = false;
-    renderTabs();
+  const scroller = editorScroller();
+  const scrollTop = scroller ? scroller.scrollTop : 0;
+  suppressChange = true;
+  activateState(editor, reloadedDocState(editor.state, content));
+  suppressChange = false;
+  t.state = editor.state;
+  if (scroller) {
+    scroller.scrollTop = scrollTop;
+    requestAnimationFrame(() => { scroller.scrollTop = scrollTop; });
   }
+  currentFileMtime = mtime;
+  setActiveModified(false);
+  updatePreview(content);
+  updateWordCountStatus();
+  updateCursorStatus();
 }
 
 function setupExternalChangeWatch() {
