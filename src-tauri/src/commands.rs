@@ -227,9 +227,12 @@ pub fn confirm_close() {}
 // Opening a window is desktop-only. The frontend's Cmd+N keydown invokes
 // this because the native menu accelerator is preempted by the webview when
 // the editor has focus, so the keyboard path can't rely on the menu.
+// Must be async: a synchronous command that creates a window deadlocks
+// WebView2 on Windows (tauri-apps/wry#583), leaving a blank window that
+// ignores Close. The menu's New Window runs on the event loop and is fine.
 #[cfg(desktop)]
 #[tauri::command]
-pub fn new_window(app: AppHandle) {
+pub async fn new_window(app: AppHandle) {
     menu::new_window(&app);
 }
 
