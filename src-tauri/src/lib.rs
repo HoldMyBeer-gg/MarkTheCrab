@@ -1,4 +1,5 @@
 mod commands;
+mod fonts;
 #[cfg(desktop)]
 mod menu;
 mod settings;
@@ -92,6 +93,7 @@ pub fn run() {
             commands::new_window,
             commands::refresh_recent_menu,
             commands::take_pending_open_file,
+            fonts::list_font_families,
         ]);
 
     // Native menus and window-close interception exist only on desktop

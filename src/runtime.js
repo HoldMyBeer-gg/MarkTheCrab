@@ -308,6 +308,9 @@ async function createBrowserApi() {
       case "confirm_close":
         return; // browser handles tab close itself
 
+      case "list_font_families":
+        return []; // browsers can't list installed fonts; the picker takes a typed name
+
       default:
         throw new Error(`Unknown invoke command in browser mode: ${name}`);
     }

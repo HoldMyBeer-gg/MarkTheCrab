@@ -154,6 +154,17 @@
     </div>
   </dialog>
 
+  <dialog id="font-dialog" class="app-dialog font-dialog" aria-labelledby="font-dialog-title">
+    <h3 id="font-dialog-title">Choose a font</h3>
+    <input type="search" id="font-search" placeholder="Search installed fonts" aria-label="Search fonts" autocomplete="off" spellcheck="false">
+    <ul id="font-list" class="font-list" role="listbox" aria-label="Installed fonts"></ul>
+    <div id="font-preview" class="font-preview" aria-hidden="true">The quick brown fox jumps over the lazy dog. 0O 1lI {}[]</div>
+    <div class="dialog-buttons">
+      <button id="font-cancel" type="button">Cancel</button>
+      <button id="font-choose" type="button" class="primary">Choose</button>
+    </div>
+  </dialog>
+
   <dialog id="image-dialog" class="app-dialog" aria-labelledby="image-dialog-title">
     <h3 id="image-dialog-title">Insert Image</h3>
     <label>URL or path
@@ -221,11 +232,15 @@
       <div class="settings-row">
         <div class="settings-label-group">
           <div class="settings-label">Editor font</div>
-          <div class="settings-hint">OpenDyslexic for accessibility</div>
+          <div class="settings-hint">Bundled, or any installed font</div>
         </div>
         <select id="settings-font-select" class="settings-select" aria-label="Editor font">
           <option value="default">Default</option>
+          <option disabled>──────────</option>
           <option value="opendyslexic">OpenDyslexic</option>
+          <option disabled>──────────</option>
+          <option value="system" id="settings-font-system" hidden></option>
+          <option value="choose">Choose a font…</option>
         </select>
       </div>
       <div class="settings-row settings-row-last">

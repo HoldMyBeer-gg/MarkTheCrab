@@ -33,3 +33,8 @@ tauri-build = { version = "2", features = [] }
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
+
+# Installed-font listing for the font picker. Pure Rust, so no fontconfig or
+# freetype system libraries are needed; mobile gets the in-app text fallback.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+fontdb = "0.24"

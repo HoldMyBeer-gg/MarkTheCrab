@@ -8,6 +8,7 @@ window.hljs = hljs;
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
+import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies } from "./fonts.js";
 import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
 
 // Raised while a save/open is mid-flight or any native dialog is up, so the
@@ -360,22 +361,136 @@ function applySettings() {
 
 // Known font-family presets. "default" falls back to the app stylesheet's
 // system font; "opendyslexic" enables the embedded OpenDyslexic face.
-const FONT_FAMILIES = {
-  default: "",
-  opendyslexic: "'OpenDyslexic', Georgia, serif",
-};
-
-function fontFamilyKey(stored) {
-  if (!stored) return "default";
-  const normalized = stored.toLowerCase();
-  if (normalized.includes("opendyslexic")) return "opendyslexic";
-  return "default";
+function applyFontFamily(stored) {
+  const choice = parseFontSetting(stored);
+  document.body.classList.toggle("font-opendyslexic", choice.kind === "bundled" && choice.id === "opendyslexic");
+  if (editor) setFontFamily(editor, fontStack(choice));
 }
 
-function applyFontFamily(stored) {
-  const key = fontFamilyKey(stored);
-  document.body.classList.toggle("font-opendyslexic", key === "opendyslexic");
-  if (editor) setFontFamily(editor, FONT_FAMILIES[key] || "");
+function setFontSetting(choice) {
+  const stored = fontSettingValue(choice);
+  settings.font_family = stored;
+  applyFontFamily(stored);
+  syncFontSelect();
+  invoke("update_setting", { key: "font_family", value: stored });
+}
+
+// Point the settings dropdown at the current font. A chosen system font gets
+// its own entry above "Choose a font…".
+function syncFontSelect() {
+  const choice = parseFontSetting(settings.font_family);
+  const sysOpt = document.getElementById("settings-font-system");
+  if (sysOpt) {
+    sysOpt.hidden = choice.kind !== "system";
+    sysOpt.textContent = choice.kind === "system" ? choice.family : "";
+  }
+  const sel = document.getElementById("settings-font-select");
+  if (sel) sel.value = selectValue(choice);
+}
+
+let fontFamiliesPromise = null;
+function loadFontFamilies() {
+  fontFamiliesPromise ??= invoke("list_font_families").catch(() => []);
+  return fontFamiliesPromise;
+}
+
+// The "Choose a font…" dialog. Resolves to a family name, or null if
+// cancelled. Any typed name can be used too: fonts the scan missed, and
+// platforms that can't list fonts (browser demo, iOS).
+function chooseFontFamily(current) {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById("font-dialog");
+    const search = document.getElementById("font-search");
+    const list = document.getElementById("font-list");
+    const preview = document.getElementById("font-preview");
+    const chooseBtn = document.getElementById("font-choose");
+    let families = null; // null while loading
+    let shown = [];
+    let selected = current.kind === "system" ? current.family : null;
+
+    const select = (family, scroll = false) => {
+      selected = family;
+      preview.style.fontFamily = family ? fontStack({ kind: "system", family }) : "";
+      chooseBtn.disabled = !family;
+      for (const li of list.children) {
+        const on = li.dataset.family === family;
+        li.setAttribute("aria-selected", String(on));
+        if (on && scroll) li.scrollIntoView({ block: "nearest" });
+      }
+    };
+
+    const note = (text) => {
+      const li = document.createElement("li");
+      li.className = "font-list-empty";
+      li.textContent = text;
+      return li;
+    };
+
+    const render = () => {
+      const q = search.value.trim();
+      shown = filterFamilies(families || [], q);
+      const typed = q && !shown.some((f) => f.toLowerCase() === q.toLowerCase());
+      if (typed) shown.unshift(q);
+      const items = shown.map((family, i) => {
+        const li = document.createElement("li");
+        li.setAttribute("role", "option");
+        li.dataset.family = family;
+        li.textContent = typed && i === 0 ? `Use \u201c${family}\u201d` : family;
+        li.style.fontFamily = fontStack({ kind: "system", family });
+        return li;
+      });
+      if (items.length === 0) {
+        items.push(note(families === null ? "Loading fonts…" : "Type a font name"));
+      }
+      list.replaceChildren(...items);
+      const keep = selected && shown.includes(selected) && !q;
+      select(keep ? selected : (q ? shown[0] ?? null : selected), true);
+    };
+
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      search.oninput = search.onkeydown = list.onclick = list.ondblclick = null;
+      if (dlg.open) dlg.close();
+      resolve(val);
+    };
+
+    search.value = "";
+    search.oninput = render;
+    search.onkeydown = (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        if (shown.length === 0) return;
+        const idx = shown.indexOf(selected);
+        const next = e.key === "ArrowDown" ? Math.min(idx + 1, shown.length - 1) : Math.max(idx - 1, 0);
+        select(shown[next], true);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (selected) finish(selected);
+      }
+    };
+    list.onclick = (e) => {
+      const li = e.target.closest("li[data-family]");
+      if (li) select(li.dataset.family);
+    };
+    list.ondblclick = (e) => {
+      const li = e.target.closest("li[data-family]");
+      if (li) finish(li.dataset.family);
+    };
+    chooseBtn.onclick = () => { if (selected) finish(selected); };
+    document.getElementById("font-cancel").onclick = () => finish(null);
+    dlg.addEventListener("close", () => finish(null), { once: true });
+
+    render();
+    dlg.showModal();
+    search.focus();
+    loadFontFamilies().then((names) => {
+      if (settled) return;
+      families = names;
+      render();
+    });
+  });
 }
 
 const KNOWN_THEMES = new Set([
@@ -1616,12 +1731,16 @@ function setupSettingsDialog() {
   });
 
   const fontSel = document.getElementById("settings-font-select");
-  fontSel.addEventListener("change", (e) => {
-    const key = e.target.value;
-    const stored = key === "opendyslexic" ? "OpenDyslexic" : "";
-    settings.font_family = stored;
-    applyFontFamily(stored);
-    invoke("update_setting", { key: "font_family", value: stored });
+  fontSel.addEventListener("change", async (e) => {
+    const value = e.target.value;
+    if (value === "system") return; // the font already in use
+    if (value === "choose") {
+      const family = await chooseFontFamily(parseFontSetting(settings.font_family));
+      if (family) setFontSetting({ kind: "system", family });
+      else syncFontSelect(); // cancelled: put the dropdown back
+      return;
+    }
+    setFontSetting(value === "opendyslexic" ? { kind: "bundled", id: "opendyslexic" } : { kind: "default" });
   });
 
   document.getElementById("settings-custom-css-open").onclick = () => {
@@ -1698,7 +1817,7 @@ function syncSettingsDialog() {
     if (el) el.value = value;
   };
   sel("settings-theme-select", settings.theme || "github");
-  sel("settings-font-select", fontFamilyKey(settings.font_family));
+  syncFontSelect();
   set("settings-word-wrap", settings.word_wrap !== false);
   set("settings-line-numbers", settings.line_numbers !== false);
   set("settings-show-toolbar", settings.show_toolbar !== false);
