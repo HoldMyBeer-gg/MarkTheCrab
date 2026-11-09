@@ -592,18 +592,7 @@ html, body {
   src: url("../fonts/opendyslexic/OpenDyslexic-BoldItalic.otf") format("opentype");
 }
 
-body.font-opendyslexic,
-body.font-opendyslexic #preview,
-body.font-opendyslexic .cm-content,
-body.font-opendyslexic .cm-gutters {
-  font-family: "OpenDyslexic", Georgia, serif !important;
-}
-/* Themes set fonts on elements inside the preview (Solarized's `html *`,
-   most themes' p/h1), which beat the inherited font above. Code, math and
-   diagrams keep their own fonts. */
-body.font-opendyslexic #preview *:not(code, pre, pre *, kbd, samp, .katex, .katex *, svg, svg *) {
-  font-family: "OpenDyslexic", Georgia, serif !important;
-}
+/* Applied per side by the Preview font / Editor font settings (fonts.js). */
 
 /* Font picker */
 .font-dialog { width: min(480px, 92vw); }

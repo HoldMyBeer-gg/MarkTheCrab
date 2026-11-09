@@ -6,6 +6,7 @@ import {
   cssFamily,
   selectValue,
   filterFamilies,
+  previewFontCss,
 } from "./fonts.js";
 
 describe("parseFontSetting", () => {
@@ -60,6 +61,30 @@ describe("fontStack", () => {
 
   it("falls back to monospace after a system font", () => {
     expect(fontStack({ kind: "system", family: "Menlo" })).toBe('"Menlo", monospace');
+  });
+
+  it("takes a different fallback for prose", () => {
+    expect(fontStack({ kind: "system", family: "Georgia" }, "serif")).toBe('"Georgia", serif');
+  });
+});
+
+describe("previewFontCss", () => {
+  it("is empty for Default so the theme's font shows", () => {
+    expect(previewFontCss({ kind: "default" }, "#preview")).toBe("");
+  });
+
+  it("forces the font on the preview and everything in it, beating theme rules", () => {
+    const css = previewFontCss({ kind: "system", family: "Apple Chancery" }, "#preview");
+    expect(css).toContain('font-family: "Apple Chancery", serif !important');
+    expect(css).toMatch(/^#preview, #preview \*:not\(/);
+  });
+
+  it("leaves code, math and diagrams in their own fonts", () => {
+    const css = previewFontCss({ kind: "bundled", id: "opendyslexic" }, "#preview");
+    for (const kept of ["code", "pre", "pre *", "kbd", "samp", ".katex", ".katex *", "svg", "svg *"]) {
+      expect(css).toContain(kept);
+    }
+    expect(css).toContain("'OpenDyslexic', Georgia, serif !important");
   });
 });
 

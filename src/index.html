@@ -231,15 +231,27 @@
       </div>
       <div class="settings-row">
         <div class="settings-label-group">
-          <div class="settings-label">Editor font</div>
-          <div class="settings-hint">Bundled, or any installed font</div>
+          <div class="settings-label">Preview font</div>
+          <div class="settings-hint">Text in the preview pane</div>
         </div>
-        <select id="settings-font-select" class="settings-select" aria-label="Editor font">
-          <option value="default">Default</option>
+        <select id="settings-preview-font-select" class="settings-select" aria-label="Preview font">
+          <option value="default">Theme default</option>
           <option disabled>──────────</option>
           <option value="opendyslexic">OpenDyslexic</option>
           <option disabled>──────────</option>
-          <option value="system" id="settings-font-system" hidden></option>
+          <option value="choose">Choose a font…</option>
+        </select>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label-group">
+          <div class="settings-label">Editor font</div>
+          <div class="settings-hint">The editor side</div>
+        </div>
+        <select id="settings-font-select" class="settings-select" aria-label="Editor font">
+          <option value="default">Default (monospace)</option>
+          <option disabled>──────────</option>
+          <option value="opendyslexic">OpenDyslexic</option>
+          <option disabled>──────────</option>
           <option value="choose">Choose a font…</option>
         </select>
       </div>

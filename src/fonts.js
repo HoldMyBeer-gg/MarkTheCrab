@@ -35,10 +35,23 @@ export function cssFamily(name) {
   return `"${String(name).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-export function fontStack(choice) {
-  if (choice.kind === "system") return `${cssFamily(choice.family)}, monospace`;
+// `fallback` covers a system font that's been uninstalled since it was chosen.
+export function fontStack(choice, fallback = "monospace") {
+  if (choice.kind === "system") return `${cssFamily(choice.family)}, ${fallback}`;
   if (choice.kind === "bundled") return BUNDLED_FONTS[choice.id]?.stack ?? "";
   return "";
+}
+
+// Preview elements that keep their own font whatever the preview font is.
+const PREVIEW_KEEPS_FONT = "code, pre, pre *, kbd, samp, .katex, .katex *, svg, svg *";
+
+// CSS putting the chosen font on all preview text. Themes give elements
+// their own font (Solarized's `html *`, most themes' p/h1), so the preview
+// root alone isn't enough: everything inside gets it too, with !important.
+export function previewFontCss(choice, scope) {
+  const stack = fontStack(choice, "serif");
+  if (!stack) return "";
+  return `${scope}, ${scope} *:not(${PREVIEW_KEEPS_FONT}) { font-family: ${stack} !important; }`;
 }
 
 // Value of the matching <option> in the settings dropdown.

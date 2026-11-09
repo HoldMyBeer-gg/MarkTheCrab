@@ -15,6 +15,7 @@ const SETTINGS_DEFAULTS = {
   theme: "github",
   custom_css: "",
   font_family: "monospace",
+  preview_font: "",
   font_size: 14,
   line_numbers: true,
   word_wrap: true,
@@ -99,6 +100,7 @@ async function createBrowserApi() {
       case "theme":
       case "custom_css":
       case "font_family":
+      case "preview_font":
         s[key] = String(value);
         break;
       case "font_size":

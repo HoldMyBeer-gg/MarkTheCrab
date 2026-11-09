@@ -8,7 +8,7 @@ window.hljs = hljs;
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
-import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies } from "./fonts.js";
+import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies, previewFontCss } from "./fonts.js";
 import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
 
 // Raised while a save/open is mid-flight or any native dialog is up, so the
@@ -348,6 +348,7 @@ function applySettings() {
   applyCustomCss(settings.custom_css);
 
   applyFontFamily(settings.font_family);
+  applyPreviewFont(settings.preview_font);
 
   Mascot.configure({
     enabled: settings.show_mascot !== false,
@@ -362,30 +363,69 @@ function applySettings() {
 // Known font-family presets. "default" falls back to the app stylesheet's
 // system font; "opendyslexic" enables the embedded OpenDyslexic face.
 function applyFontFamily(stored) {
-  const choice = parseFontSetting(stored);
-  document.body.classList.toggle("font-opendyslexic", choice.kind === "bundled" && choice.id === "opendyslexic");
-  if (editor) setFontFamily(editor, fontStack(choice));
+  if (editor) setFontFamily(editor, fontStack(parseFontSetting(stored)));
 }
 
-function setFontSetting(choice) {
-  const stored = fontSettingValue(choice);
-  settings.font_family = stored;
-  applyFontFamily(stored);
-  syncFontSelect();
-  invoke("update_setting", { key: "font_family", value: stored });
-}
-
-// Point the settings dropdown at the current font. A chosen system font gets
-// its own entry above "Choose a font…".
-function syncFontSelect() {
-  const choice = parseFontSetting(settings.font_family);
-  const sysOpt = document.getElementById("settings-font-system");
-  if (sysOpt) {
-    sysOpt.hidden = choice.kind !== "system";
-    sysOpt.textContent = choice.kind === "system" ? choice.family : "";
+// The preview font goes in its own <style> so it outranks the theme's rules.
+function applyPreviewFont(stored) {
+  let style = document.getElementById("preview-font-css");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "preview-font-css";
+    document.head.appendChild(style);
   }
-  const sel = document.getElementById("settings-font-select");
-  if (sel) sel.value = selectValue(choice);
+  style.textContent = previewFontCss(parseFontSetting(stored), "#preview");
+}
+
+// The two font settings share one dropdown layout and the picker dialog.
+const FONT_SETTINGS = [
+  { selectId: "settings-preview-font-select", key: "preview_font", apply: applyPreviewFont },
+  { selectId: "settings-font-select", key: "font_family", apply: applyFontFamily },
+];
+
+function setFontSetting(fs, choice) {
+  const stored = fontSettingValue(choice);
+  settings[fs.key] = stored;
+  fs.apply(stored);
+  syncFontSelect(fs);
+  invoke("update_setting", { key: fs.key, value: stored });
+}
+
+// Point a font dropdown at its current font. A chosen system font gets its
+// own entry above "Choose a font…". The entry is added and removed, not
+// hidden: macOS's native select menu ignores `hidden` on options.
+function syncFontSelect(fs) {
+  const choice = parseFontSetting(settings[fs.key]);
+  const sel = document.getElementById(fs.selectId);
+  if (!sel) return;
+  let sysOpt = sel.querySelector('option[value="system"]');
+  if (choice.kind === "system") {
+    if (!sysOpt) {
+      sysOpt = document.createElement("option");
+      sysOpt.value = "system";
+      sel.insertBefore(sysOpt, sel.querySelector('option[value="choose"]'));
+    }
+    sysOpt.textContent = choice.family;
+  } else if (sysOpt) {
+    sysOpt.remove();
+  }
+  sel.value = selectValue(choice);
+}
+
+function bindFontSelect(fs) {
+  const sel = document.getElementById(fs.selectId);
+  if (!sel) return;
+  sel.addEventListener("change", async (e) => {
+    const value = e.target.value;
+    if (value === "system") return; // the font already in use
+    if (value === "choose") {
+      const family = await chooseFontFamily(parseFontSetting(settings[fs.key]));
+      if (family) setFontSetting(fs, { kind: "system", family });
+      else syncFontSelect(fs); // cancelled: put the dropdown back
+      return;
+    }
+    setFontSetting(fs, value === "opendyslexic" ? { kind: "bundled", id: "opendyslexic" } : { kind: "default" });
+  });
 }
 
 let fontFamiliesPromise = null;
@@ -1730,18 +1770,7 @@ function setupSettingsDialog() {
     updatePreview(getContent(editor));
   });
 
-  const fontSel = document.getElementById("settings-font-select");
-  fontSel.addEventListener("change", async (e) => {
-    const value = e.target.value;
-    if (value === "system") return; // the font already in use
-    if (value === "choose") {
-      const family = await chooseFontFamily(parseFontSetting(settings.font_family));
-      if (family) setFontSetting({ kind: "system", family });
-      else syncFontSelect(); // cancelled: put the dropdown back
-      return;
-    }
-    setFontSetting(value === "opendyslexic" ? { kind: "bundled", id: "opendyslexic" } : { kind: "default" });
-  });
+  FONT_SETTINGS.forEach(bindFontSelect);
 
   document.getElementById("settings-custom-css-open").onclick = () => {
     dialog.close();
@@ -1817,7 +1846,7 @@ function syncSettingsDialog() {
     if (el) el.value = value;
   };
   sel("settings-theme-select", settings.theme || "github");
-  syncFontSelect();
+  FONT_SETTINGS.forEach(syncFontSelect);
   set("settings-word-wrap", settings.word_wrap !== false);
   set("settings-line-numbers", settings.line_numbers !== false);
   set("settings-show-toolbar", settings.show_toolbar !== false);

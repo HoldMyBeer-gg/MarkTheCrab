@@ -113,6 +113,7 @@ pub fn update_setting(state: State<AppState>, key: &str, value: &str) -> Result<
         "theme" => settings.theme = value.to_string(),
         "custom_css" => settings.custom_css = value.to_string(),
         "font_family" => settings.font_family = value.to_string(),
+        "preview_font" => settings.preview_font = value.to_string(),
         "font_size" => {
             settings.font_size = value
                 .parse()

@@ -7,6 +7,10 @@ pub struct Settings {
     pub theme: String,
     pub custom_css: String,
     pub font_family: String,
+    /// Preview pane font: "" (the theme's own), "OpenDyslexic" or
+    /// "system:<Family>". Older settings files don't have it.
+    #[serde(default)]
+    pub preview_font: String,
     pub font_size: u32,
     pub line_numbers: bool,
     pub word_wrap: bool,
@@ -39,6 +43,7 @@ impl Default for Settings {
             theme: "github".to_string(),
             custom_css: String::new(),
             font_family: "monospace".to_string(),
+            preview_font: String::new(),
             font_size: 14,
             line_numbers: true,
             word_wrap: true,
@@ -91,5 +96,23 @@ impl Settings {
         self.recent_files.retain(|p| p != path);
         self.recent_files.insert(0, path.to_string());
         self.recent_files.truncate(10);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_from_before_preview_font_still_load() {
+        // A settings.toml written by v0.2.10: no preview_font key.
+        let mut old = toml::to_string(&Settings::default()).unwrap();
+        old = old
+            .lines()
+            .filter(|l| !l.starts_with("preview_font"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let s: Settings = toml::from_str(&old).unwrap();
+        assert_eq!(s.preview_font, "");
     }
 }
