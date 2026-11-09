@@ -57,7 +57,7 @@ jobs:
       - name: Stage site
         run: |
           mkdir -p _site
-          cp -R src/index.html src/styles src/assets src/themes src/vendor src/dist src/mascot-expressions.js _site/
+          cp -R src/index.html src/styles src/assets src/themes src/vendor src/dist src/fonts src/mascot-expressions.js _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

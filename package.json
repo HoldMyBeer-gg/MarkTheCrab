@@ -10,11 +10,13 @@
     "build": "npm run build:web",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "build:demo": "npm run build:wasm && npm run build:web",
     "dev": "node scripts/build-mascot.mjs && esbuild src/app.js --bundle --outdir=src/dist --format=esm --splitting --watch --sourcemap --external:./wasm/pkg/* --external:@upsetjs/venn.js --loader:.aff=text --loader:.dic=text",
     "tauri": "tauri"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@tauri-apps/cli": "^2.10.1",
     "vitest": "^4.1.11"
   },
