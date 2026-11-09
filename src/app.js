@@ -1050,6 +1050,10 @@ function renderTabs() {
     el.setAttribute("aria-selected", String(isActive));
     el.dataset.tabId = String(t.id);
     el.title = t.file || tabTitle(t);
+    // Without this the tab's accessible name folds in its close button's
+    // label ("x.md Close x.md") on some engines, so name-based automation
+    // and screen readers saw active and inactive tabs differently.
+    el.setAttribute("aria-label", tabTitle(t));
 
     const label = document.createElement("span");
     label.className = "tab-label";
