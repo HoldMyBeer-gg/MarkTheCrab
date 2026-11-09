@@ -9,6 +9,8 @@ import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isB
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
 import { scopeDocumentCss } from "./doc-css.js";
+import { searchEmoji } from "./emoji.js";
+import { EMOJI_GROUPS } from "./emoji-data.js";
 import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies, previewFontCss } from "./fonts.js";
 import { saveTab, saveTabAs, reloadTab, statAll, findTabByPath, createPauseGate, wrapDialogs } from "./tab-io.js";
 
@@ -1836,12 +1838,103 @@ function setupSettingsDialog() {
 // just return focus to the editor — the `:shortcode` / `:)` completion is the
 // cross-platform way in and works everywhere regardless.
 async function openEmojiPicker() {
-  editor.focus();
-  try {
-    await invoke("open_emoji_picker");
-  } catch {
-    // No native picker here; the in-editor completion covers it.
+  // macOS has a good native palette; everywhere else (Windows, Linux,
+  // SteamOS gaming mode, the browser) there's none we can rely on.
+  if (platformName === "macos") {
+    editor.focus();
+    try {
+      await invoke("open_emoji_picker");
+      return;
+    } catch {
+      /* fall through to the in-app picker */
+    }
   }
+  const ch = await chooseEmoji();
+  editor.focus();
+  if (ch) insertAtCursor(editor, ch);
+}
+
+// The in-app emoji picker. Resolves to the chosen emoji, or null.
+function chooseEmoji() {
+  return new Promise((resolve) => {
+    const dlg = document.getElementById("emoji-dialog");
+    const search = document.getElementById("emoji-search");
+    const grid = document.getElementById("emoji-grid");
+    let top = null; // what Enter inserts
+
+    const cell = (e) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = e.ch;
+      b.title = `:${e.sc}:`;
+      b.setAttribute("aria-label", e.sc);
+      b.dataset.ch = e.ch;
+      return b;
+    };
+    const cells = (items) => {
+      const div = document.createElement("div");
+      div.className = "emoji-cells";
+      div.append(...items.map(cell));
+      return div;
+    };
+
+    const render = () => {
+      const hits = searchEmoji(search.value);
+      if (!search.value.trim()) {
+        top = null;
+        grid.replaceChildren(
+          ...EMOJI_GROUPS.flatMap((g) => {
+            const h = document.createElement("h4");
+            h.textContent = g.name;
+            return [h, cells(g.items)];
+          }),
+        );
+      } else if (hits.length === 0) {
+        top = null;
+        const p = document.createElement("div");
+        p.className = "emoji-empty";
+        p.textContent = "No emoji match that.";
+        grid.replaceChildren(p);
+      } else {
+        top = hits[0].ch;
+        const c = cells(hits);
+        c.firstChild.classList.add("top");
+        grid.replaceChildren(c);
+      }
+      grid.scrollTop = 0;
+    };
+
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      search.oninput = search.onkeydown = grid.onclick = null;
+      if (dlg.open) dlg.close();
+      resolve(val);
+    };
+
+    search.value = "";
+    search.oninput = render;
+    search.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (top) finish(top);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        grid.querySelector("button")?.focus();
+      }
+    };
+    grid.onclick = (e) => {
+      const b = e.target.closest("button[data-ch]");
+      if (b) finish(b.dataset.ch);
+    };
+    document.getElementById("emoji-close").onclick = () => finish(null);
+    dlg.addEventListener("close", () => finish(null), { once: true });
+
+    render();
+    dlg.showModal();
+    search.focus();
+  });
 }
 
 // Bind a button[role=switch] to a boolean setting. `apply` runs the

@@ -55,6 +55,20 @@ function inCodeOrUrl(state, pos) {
   return false;
 }
 
+// Emoji for the picker's search box: shortcode prefix matches first, then
+// anything whose shortcode or keywords contain the query. Empty query → [].
+export function searchEmoji(query) {
+  const q = query.trim().toLowerCase().replace(/^:|:$/g, "");
+  if (!q) return [];
+  const starts = [];
+  const contains = [];
+  for (const e of EMOJI) {
+    if (e.sc.startsWith(q)) starts.push(e);
+    else if (e.hay.includes(q)) contains.push(e);
+  }
+  return [...starts, ...contains];
+}
+
 function rankShortcodes(query) {
   if (!query) {
     return POPULAR.map((sc) => {

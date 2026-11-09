@@ -3,7 +3,8 @@ import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { CompletionContext } from "@codemirror/autocomplete";
-import { emojiSource } from "./emoji.js";
+import { emojiSource, searchEmoji } from "./emoji.js";
+import { EMOJI_GROUPS } from "./emoji-data.js";
 
 // Build a completion context with the cursor at the end of `doc` (or at the
 // given pos). Mirrors how CodeMirror invokes the source while typing.
@@ -102,5 +103,30 @@ describe("emoji emoticon completion", () => {
   it("does not treat ordinary prose punctuation as an emoticon", () => {
     // 'foo)' after a space: no emoticon starts with 'foo)'
     expect(emojiSource(contextFor("a foo)"))).toBeNull();
+  });
+});
+
+describe("emoji picker data", () => {
+  it("groups every emoji under a named section, in the data file's order", () => {
+    const names = EMOJI_GROUPS.map((g) => g.name);
+    expect(names[0]).toBe("Smileys");
+    expect(names).toContain("Animals & nature");
+    for (const g of EMOJI_GROUPS) expect(g.items.length).toBeGreaterThan(0);
+    const crab = EMOJI_GROUPS.find((g) => g.name === "Animals & nature").items.find((e) => e.sc === "crab");
+    expect(crab.ch).toBe("🦀");
+  });
+
+  it("searches shortcodes first, then keywords, case-insensitively", () => {
+    const hits = searchEmoji("CRAB");
+    expect(hits[0].sc).toBe("crab");
+    const laugh = searchEmoji("laugh").map((e) => e.sc);
+    expect(laugh).toContain("laughing"); // shortcode starts with it
+    expect(laugh).toContain("joy"); // keyword match
+    expect(laugh.indexOf("laughing")).toBeLessThan(laugh.indexOf("joy"));
+  });
+
+  it("returns nothing for an empty or unmatched query", () => {
+    expect(searchEmoji("   ")).toEqual([]);
+    expect(searchEmoji("zzzznotanemoji")).toEqual([]);
   });
 });

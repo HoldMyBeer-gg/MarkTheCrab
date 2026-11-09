@@ -594,6 +594,44 @@ html, body {
 
 /* Applied per side by the Preview font / Editor font settings (fonts.js). */
 
+/* Emoji picker: drawn in-app so it works where no OS picker exists
+   (Windows, Linux, SteamOS gaming mode under gamescope, the browser). */
+.emoji-dialog { width: min(440px, 94vw); }
+.emoji-dialog input[type="search"] { margin: 0 0 8px; }
+.emoji-grid {
+  height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  padding: 4px 6px;
+}
+.emoji-grid h4 {
+  margin: 8px 2px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.emoji-grid .emoji-cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+}
+.emoji-grid button {
+  height: 36px;
+  font-size: 22px;
+  line-height: 1;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.emoji-grid button:hover,
+.emoji-grid button:focus-visible { background: var(--bg-secondary); outline: none; }
+.emoji-grid button.top { background: var(--bg-secondary); }
+.emoji-grid .emoji-empty { padding: 10px; color: var(--text-muted); font-size: 13px; }
+
 /* Font picker */
 .font-dialog { width: min(480px, 92vw); }
 .font-dialog input[type="search"] { margin: 0 0 8px; }
