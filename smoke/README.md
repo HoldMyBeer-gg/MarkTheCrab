@@ -63,7 +63,10 @@ bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
 - `key` takes one key (`Return`, `Escape`, a single character). bad-ass-mcp
   has no Ctrl/Cmd chords on macOS or Windows, so scripts use toolbar buttons
   and menu items instead of shortcuts.
-- Typing into the CodeMirror editor through `type` doesn't work (it isn't a
-  plain text field); preload documents with `setup` + `launch`, and use
-  single-character `key` steps for small edits.
+- Typing into the CodeMirror editor with `type`: works on Linux (the backend
+  sends real keystrokes through xdotool to the focused element, which is how
+  bad-ass-mcp's own MarkTheCrab demo is recorded); does nothing on macOS
+  (the backend sets the AX value, which CodeMirror ignores); unverified on
+  Windows. Scripts preload documents with `setup` + `launch` and use
+  single-character `key` steps, which work everywhere.
 - macOS opens its own emoji palette, so emoji-picker scripts skip `macos`.
