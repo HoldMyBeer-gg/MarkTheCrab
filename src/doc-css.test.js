@@ -62,4 +62,30 @@ describe("serializeScopedRules", () => {
     ], S);
     expect(css).toBe('@font-face { font-family: "Mine"; src: url(data:font/woff2;base64,AA); }');
   });
+
+  it("paints a root background on the whole pane, like a page background fills the window", () => {
+    const opts = { paneScope: "#preview-pane" };
+    for (const root of ["html", "body", ":root"]) {
+      const css = serializeScopedRules([{ type: "style", selector: root, declarations: "background: lime; color: red;" }], S, opts);
+      expect(css).toContain("#preview { background: lime; color: red; }");
+      expect(css).toContain("#preview-pane { background: lime; }");
+    }
+  });
+
+  it("only takes background properties to the pane, and only from root selectors", () => {
+    const opts = { paneScope: "#preview-pane" };
+    const css = serializeScopedRules([
+      { type: "style", selector: "html, .x", declarations: "background-color: rgb(1, 2, 3); display: none;" },
+      { type: "style", selector: ".y", declarations: "background: red;" },
+    ], S, opts);
+    expect(css).toContain("#preview-pane { background-color: rgb(1, 2, 3); }");
+    expect(css.match(/#preview-pane/g)).toHaveLength(1);
+  });
+
+  it("keeps a pane background inside its @media", () => {
+    const css = serializeScopedRules([
+      { type: "media", condition: "print", rules: [{ type: "style", selector: "body", declarations: "background: white;" }] },
+    ], S, { paneScope: "#preview-pane" });
+    expect(css).toBe("@media print { #preview { background: white; }\n#preview-pane { background: white; } }");
+  });
 });

@@ -317,6 +317,9 @@ async function createBrowserApi() {
       case "confirm_close":
         return; // browser handles tab close itself
 
+      case "same_file":
+        return args.a === args.b; // browser paths are synthetic ids
+
       case "list_font_families":
         return []; // browsers can't list installed fonts; the picker takes a typed name
 

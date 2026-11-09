@@ -25,8 +25,14 @@ export async function saveTab(tab, { contentOf, statMtime, writeFile, confirmOve
 // Save `tab` to a new `path`. Another tab with that path open gets closed,
 // after asking if it has unsaved edits. Nothing changes unless the write
 // succeeds; a failed write throws.
-export async function saveTabAs(tab, path, { tabs, contentOf, writeFile, confirmReplaceDirty }) {
-  const others = tabs.filter((t) => t !== tab && t.file === path);
+//
+// `samePath(a, b)` decides whether two paths name the same file; the default
+// compares strings, the app asks the OS (case, separators, `\\?\` prefixes).
+export async function saveTabAs(tab, path, { tabs, contentOf, writeFile, confirmReplaceDirty, samePath = exactPath }) {
+  const others = [];
+  for (const t of tabs) {
+    if (t !== tab && t.file && (await samePath(t.file, path))) others.push(t);
+  }
   const dirty = others.filter((t) => t.isModified);
   if (dirty.length > 0 && !(await confirmReplaceDirty(dirty))) return { saved: false };
 
@@ -40,6 +46,16 @@ export async function saveTabAs(tab, path, { tabs, contentOf, writeFile, confirm
     if (idx !== -1) tabs.splice(idx, 1);
   }
   return { saved: true, mtime, dropped: others };
+}
+
+const exactPath = async (a, b) => a === b;
+
+// The tab that has `path` open, however the path is spelled, or null.
+export async function findTabByPath(tabs, path, samePath = exactPath) {
+  for (const t of tabs) {
+    if (t.file && (t.file === path || (await samePath(t.file, path)))) return t;
+  }
+  return null;
 }
 
 function markWritten(tab, mtime, changedSince) {

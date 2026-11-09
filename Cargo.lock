@@ -1888,6 +1888,7 @@ dependencies = [
  "markdown-core",
  "objc2",
  "objc2-app-kit",
+ "same-file",
  "serde",
  "serde_json",
  "tauri",

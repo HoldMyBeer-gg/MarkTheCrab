@@ -10,7 +10,7 @@ import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumen
 import { scopeThemeCss } from "./theme-scope.js";
 import { scopeDocumentCss } from "./doc-css.js";
 import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies, previewFontCss } from "./fonts.js";
-import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
+import { saveTab, saveTabAs, reloadTab, statAll, findTabByPath, createPauseGate, wrapDialogs } from "./tab-io.js";
 
 // Raised while a save/open is mid-flight or any native dialog is up, so the
 // focus event from a closing sheet can't start an external-change check that
@@ -554,7 +554,9 @@ async function applyTheme(themeName) {
   const style = document.createElement("style");
   style.id = "theme-css";
   style.textContent = scoped;
-  document.head.appendChild(style);
+  // The theme loads asynchronously; keep it ahead of the document's own
+  // <style> rules so those win ties, whichever arrives first.
+  document.head.insertBefore(style, document.getElementById("doc-css"));
   currentThemeLink = style;
 }
 
@@ -654,7 +656,7 @@ function applyDocumentCss(css) {
     style.id = "doc-css";
     document.head.appendChild(style);
   }
-  style.textContent = scopeDocumentCss(css, "#preview");
+  style.textContent = scopeDocumentCss(css, "#preview", { paneScope: "#preview-pane" });
 }
 
 const katexCache = new Map(); // source → rendered HTML
@@ -1122,8 +1124,8 @@ function loadFile(path) {
 }
 
 async function loadFileNow(path) {
-  // Already open? Just switch to that tab.
-  const existing = tabs.find((t) => t.file === path);
+  // Already open (however the path is spelled)? Just switch to that tab.
+  const existing = await findTabByPath(tabs, path, samePath);
   if (existing) {
     activateTab(existing.id);
     await refreshRecentFiles();
@@ -1211,6 +1213,9 @@ function tabContent(t) {
 }
 
 const writeFile = (path, content) => invoke("write_file_with_mtime", { path, content });
+// One file can arrive spelled differently (Windows case and separators, a CLI
+// arg vs a dialog pick), so ask the OS whether two paths are the same file.
+const samePath = (a, b) => a === b || invoke("same_file", { a, b }).catch(() => false);
 const statMtime = (path) => invoke("stat_mtime", { path });
 
 async function saveFile() {
@@ -1268,6 +1273,7 @@ async function saveTabToPath(t, path) {
         tabs,
         contentOf: tabContent,
         writeFile,
+        samePath,
         confirmReplaceDirty: (dirty) => ask(
           `"${tabTitle(dirty[0])}" is open in another tab with unsaved changes. Saving here overwrites that file and closes the tab, losing those changes.`,
           { title: "Unsaved changes", kind: "warning", okLabel: "Replace", cancelLabel: "Cancel" }

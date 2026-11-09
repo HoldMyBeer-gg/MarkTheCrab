@@ -86,6 +86,7 @@ pub fn run() {
             commands::save_image,
             commands::read_file_with_mtime,
             commands::stat_mtime,
+            commands::same_file,
             commands::write_file_with_mtime,
             commands::get_credits,
             commands::open_emoji_picker,

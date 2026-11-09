@@ -46,4 +46,13 @@ test.describe("document <style>", () => {
     await setDoc(page, 'Plain text with a <span class="red">red span</span>.');
     await expect.poll(() => computed(page.locator("#preview .red"), "color")).not.toBe("rgb(220, 20, 60)");
   });
+
+  test("an html background fills the whole preview pane, and nothing outside it", async ({ page }) => {
+    await openApp(page);
+    const toolbarBg = await computed(page.locator("#toolbar"), "backgroundColor");
+    await setDoc(page, "<style>html { background: rgb(0, 255, 0); }</style>\n\nshort");
+    await expect.poll(() => computed(page.locator("#preview-pane"), "backgroundColor")).toBe("rgb(0, 255, 0)");
+    expect(await computed(page.locator("#toolbar"), "backgroundColor")).toBe(toolbarBg);
+  });
 });
+

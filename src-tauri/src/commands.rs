@@ -195,6 +195,14 @@ fn trim_trailing_whitespace(content: &str) -> String {
 
 // Returns the current mtime for a path, or None if the file no longer
 // exists (e.g. moved or deleted externally while open).
+/// Whether two paths name the same file on disk, however they're spelled
+/// (case on Windows/macOS, `\\` vs `/`, `\\?\\` prefixes, `..`, symlinks).
+/// If either can't be opened (deleted, never saved), compare the strings.
+#[tauri::command]
+pub fn same_file(a: &str, b: &str) -> bool {
+    same_file::is_same_file(a, b).unwrap_or(a == b)
+}
+
 #[tauri::command]
 pub fn stat_mtime(path: &str) -> Result<Option<u64>, String> {
     match fs::metadata(path) {
@@ -376,4 +384,48 @@ pub fn save_image(
     // Return relative path from the markdown file's directory
     let relative = format!("images/{}", dest.file_name().unwrap().to_string_lossy());
     Ok(relative)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmp_dir(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("mtc-same-file-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(d.join("sub")).unwrap();
+        d
+    }
+
+    #[test]
+    fn same_file_sees_through_different_spellings() {
+        let d = tmp_dir("spell");
+        let f = d.join("note.md");
+        fs::write(&f, "x").unwrap();
+        let roundabout = d.join("sub").join("..").join("note.md");
+        assert!(same_file(f.to_str().unwrap(), roundabout.to_str().unwrap()));
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn different_files_are_different() {
+        let d = tmp_dir("diff");
+        fs::write(d.join("a.md"), "a").unwrap();
+        fs::write(d.join("b.md"), "b").unwrap();
+        assert!(!same_file(
+            d.join("a.md").to_str().unwrap(),
+            d.join("b.md").to_str().unwrap()
+        ));
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_missing_file_falls_back_to_comparing_the_strings() {
+        let d = tmp_dir("missing");
+        let p = d.join("gone.md");
+        let p = p.to_str().unwrap();
+        assert!(same_file(p, p));
+        assert!(!same_file(p, d.join("other.md").to_str().unwrap()));
+        let _ = fs::remove_dir_all(&d);
+    }
 }

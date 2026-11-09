@@ -4,6 +4,7 @@ import {
   saveTabAs,
   reloadTab,
   statAll,
+  findTabByPath,
   createPauseGate,
   wrapDialogs,
 } from "./tab-io.js";
@@ -140,6 +141,46 @@ describe("saveTabAs", () => {
     await expect(saveTabAs(a, "/ro/y.md", { tabs, ...deps })).rejects.toThrow("read-only");
     expect(tabs).toEqual([a, b]);
     expect(a).toMatchObject({ file: "/x.md", mtime: 1, isModified: true });
+  });
+});
+
+describe("saveTabAs with differently spelled paths", () => {
+  // Windows: same file, different case and separators.
+  const samePath = async (a, b) => a.toLowerCase().replace(/\\/g, "/") === b.toLowerCase().replace(/\\/g, "/");
+
+  it("treats a differently spelled path to an open file as the same file and asks first", async () => {
+    const a = { file: null, mtime: null, isModified: true, text: "new" };
+    const b = { file: "C:\\Notes\\style.md", mtime: 10, isModified: true, text: "precious" };
+    const tabs = [a, b];
+    const confirmReplaceDirty = vi.fn(async () => false);
+    const writeFile = vi.fn();
+    const result = await saveTabAs(a, "c:/notes/style.md", { tabs, contentOf, writeFile, confirmReplaceDirty, samePath });
+    expect(confirmReplaceDirty).toHaveBeenCalledWith([b]);
+    expect(writeFile).not.toHaveBeenCalled();
+    expect(result.saved).toBe(false);
+  });
+
+  it("drops the differently spelled duplicate once the user agrees", async () => {
+    const a = { file: null, mtime: null, isModified: true, text: "new" };
+    const b = { file: "C:\\Notes\\style.md", mtime: 10, isModified: false, text: "old" };
+    const tabs = [a, b];
+    await saveTabAs(a, "c:/notes/style.md", {
+      tabs, contentOf, writeFile: async () => 30, confirmReplaceDirty: async () => true, samePath,
+    });
+    expect(tabs).toEqual([a]);
+  });
+});
+
+describe("findTabByPath", () => {
+  const samePath = async (a, b) => a.toLowerCase() === b.toLowerCase();
+
+  it("finds the tab holding the file even when the path is spelled differently", async () => {
+    const tabs = [{ file: null }, { file: "/Users/x/Note.md" }, { file: "/Users/x/other.md" }];
+    expect(await findTabByPath(tabs, "/users/x/note.md", samePath)).toBe(tabs[1]);
+  });
+
+  it("returns null when no tab has the file", async () => {
+    expect(await findTabByPath([{ file: "/a.md" }, { file: null }], "/b.md", samePath)).toBe(null);
   });
 });
 

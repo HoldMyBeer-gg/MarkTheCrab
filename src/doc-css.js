@@ -47,16 +47,25 @@ export function scopeDocSelector(selector, scope) {
 //   { type: "media" | "supports", condition, rules }
 //   { type: "font-face", declarations }
 // Anything else (@import, @keyframes, @layer, …) is dropped.
-export function serializeScopedRules(rules, scope) {
+//
+// With `paneScope`, background properties on a root selector (html, body,
+// :root) also go to the pane around the preview, the way a page background
+// fills the whole window rather than stopping where the content ends.
+export function serializeScopedRules(rules, scope, { paneScope = null } = {}) {
   const out = [];
   for (const rule of rules) {
     if (rule.type === "style") {
       const selectors = splitSelectorList(rule.selector)
         .map((s) => scopeDocSelector(s, scope))
         .filter(Boolean);
-      if (selectors.length > 0) out.push(`${selectors.join(", ")} { ${rule.declarations} }`);
+      if (selectors.length === 0) continue;
+      out.push(`${selectors.join(", ")} { ${rule.declarations} }`);
+      if (paneScope && selectors.includes(scope)) {
+        const bg = splitDeclarations(rule.declarations).filter((d) => /^background(-|$)/i.test(propertyOf(d)));
+        if (bg.length > 0) out.push(`${paneScope} { ${bg.map((d) => d + ";").join(" ")} }`);
+      }
     } else if (rule.type === "media" || rule.type === "supports") {
-      const inner = serializeScopedRules(rule.rules, scope);
+      const inner = serializeScopedRules(rule.rules, scope, { paneScope });
       if (inner) out.push(`@${rule.type} ${rule.condition} { ${inner} }`);
     } else if (rule.type === "font-face") {
       out.push(`@font-face { ${rule.declarations} }`);
@@ -64,6 +73,32 @@ export function serializeScopedRules(rules, scope) {
   }
   return out.join("\n");
 }
+
+// Split a declaration block on semicolons outside parentheses and quotes
+// (url(data:…;base64,…) has one inside).
+function splitDeclarations(text) {
+  const decls = [];
+  let depth = 0;
+  let quote = null;
+  let start = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === "\\") i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")") depth = Math.max(0, depth - 1);
+    else if (c === ";" && depth === 0) {
+      decls.push(text.slice(start, i));
+      start = i + 1;
+    }
+  }
+  decls.push(text.slice(start));
+  return decls.map((d) => d.trim()).filter((d) => d.includes(":"));
+}
+
+const propertyOf = (decl) => decl.slice(0, decl.indexOf(":")).trim();
 
 // Browser CSSOM → the plain rule tree above.
 function fromCssom(cssRules) {
@@ -86,12 +121,12 @@ function fromCssom(cssRules) {
 
 // Parse `css` the way the webview would and return it scoped to `scope`.
 // Empty if it can't be parsed here (no constructable stylesheets).
-export function scopeDocumentCss(css, scope) {
+export function scopeDocumentCss(css, scope, { paneScope = null } = {}) {
   if (!css || !css.trim() || typeof CSSStyleSheet === "undefined") return "";
   try {
     const sheet = new CSSStyleSheet();
     sheet.replaceSync(css); // ignores @import by design
-    return serializeScopedRules(fromCssom(sheet.cssRules), scope);
+    return serializeScopedRules(fromCssom(sheet.cssRules), scope, { paneScope });
   } catch (_) {
     return "";
   }
