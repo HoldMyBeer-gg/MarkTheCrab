@@ -502,7 +502,11 @@ function chooseFontFamily(current) {
     search.value = "";
     search.oninput = render;
     search.onkeydown = (e) => {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (e.key === "Escape") {
+        // See chooseEmoji: Escape would only clear the search field.
+        e.preventDefault();
+        finish(null);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         if (shown.length === 0) return;
         const idx = shown.indexOf(selected);
@@ -1916,7 +1920,12 @@ function chooseEmoji() {
     search.value = "";
     search.oninput = render;
     search.onkeydown = (e) => {
-      if (e.key === "Enter") {
+      if (e.key === "Escape") {
+        // In a search field WebKitGTK and Chromium spend Escape on clearing
+        // the text, so the dialog's own cancel never fires. Close directly.
+        e.preventDefault();
+        finish(null);
+      } else if (e.key === "Enter") {
         e.preventDefault();
         if (top) finish(top);
       } else if (e.key === "ArrowDown") {

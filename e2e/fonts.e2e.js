@@ -44,4 +44,17 @@ test.describe("font settings", () => {
     await expect.poll(() => computed(page.locator(".cm-content"), "fontFamily")).toContain("Courier New");
     expect(await computed(page.locator("#preview p"), "fontFamily")).not.toContain("Courier New");
   });
+
+  test("Escape closes the font dialog from inside its search box", async ({ page }) => {
+    await openApp(page);
+    await openSettings(page);
+    const select = page.locator("#settings-font-select");
+    await select.selectOption("choose");
+    await page.locator("#font-search").fill("Geo");
+    await page.locator("#font-search").press("Escape");
+    await expect(page.locator("#font-dialog")).not.toBeVisible();
+    await expect(page.locator("#settings-dialog")).toBeVisible();
+    await expect(select).toHaveValue("default");
+  });
 });
+

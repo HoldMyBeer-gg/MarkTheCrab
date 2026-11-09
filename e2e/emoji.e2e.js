@@ -35,4 +35,15 @@ test.describe("emoji picker", () => {
     await expect(page.locator("#emoji-dialog")).not.toBeVisible();
     await expect(page.locator(".cm-content")).toHaveText("x🎉");
   });
+
+  test("Escape closes from inside the search box, even with text in it", async ({ page }) => {
+    await openApp(page);
+    await setDoc(page, "x");
+    await page.getByRole("button", { name: "Insert emoji" }).click();
+    await page.locator("#emoji-search").fill("cra");
+    await page.locator("#emoji-search").press("Escape");
+    await expect(page.locator("#emoji-dialog")).not.toBeVisible();
+    await expect(page.locator(".cm-content")).toHaveText("x");
+  });
 });
+
