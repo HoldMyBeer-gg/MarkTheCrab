@@ -7,6 +7,7 @@ window.hljs = hljs;
 
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
+import { scopeThemeCss } from "./theme-scope.js";
 import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
 
 // Raised while a save/open is mid-flight or any native dialog is up, so the
@@ -391,7 +392,7 @@ async function applyTheme(themeName) {
   let scoped = themeCache[themeName];
   if (scoped == null) {
     const res = await fetch(`themes/${themeName}.css`);
-    scoped = scopeThemeCss(await res.text(), "#preview");
+    scoped = scopeThemeCss(await res.text(), "#preview", { paneScope: "#preview-pane" });
     themeCache[themeName] = scoped;
   }
   const style = document.createElement("style");
@@ -401,72 +402,6 @@ async function applyTheme(themeName) {
   currentThemeLink = style;
 }
 
-// Prefix every selector in the theme stylesheet with `scope` so theme rules
-// only hit the preview pane. Root-ish selectors (body/html/:root/
-// .remarkable-preview) map to the scope element itself; everything else
-// becomes a descendant. @media print blocks are preserved verbatim so their
-// rules apply to the actual printed page (where the preview is the only
-// visible content — see the print rules in styles/app.css).
-function scopeThemeCss(css, scope) {
-  css = css.replace(/\/\*[\s\S]*?\*\//g, "");
-  // Pull @media print blocks out before scoping so their inner rules keep
-  // targeting `body`, `html`, etc. for the print output.
-  const protected_ = [];
-  css = extractBalancedAtBlocks(css, /@media\s+print\b/gi, protected_);
-  css = css.replace(/([^{}@]+)\{([^{}]*)\}/g, (match, selectors, body) => {
-    const scoped = selectors
-      .split(",")
-      .map((s) => scopeSelector(s, scope))
-      .filter(Boolean)
-      .join(", ");
-    return scoped ? `${scoped} { ${body} }` : match;
-  });
-  for (const [placeholder, block] of protected_) {
-    css = css.replace(placeholder, block);
-  }
-  return css;
-}
-
-// Replace top-level at-rule blocks matching `startRegex` with placeholder
-// tokens and record the originals in `out` as [placeholder, block] pairs.
-// Handles nested braces.
-function extractBalancedAtBlocks(css, startRegex, out) {
-  let result = "";
-  let idx = 0;
-  let m;
-  startRegex.lastIndex = 0;
-  while ((m = startRegex.exec(css)) !== null) {
-    const start = m.index;
-    let i = start + m[0].length;
-    while (i < css.length && css[i] !== "{") i++;
-    if (i >= css.length) break;
-    let depth = 1;
-    let j = i + 1;
-    while (j < css.length && depth > 0) {
-      if (css[j] === "{") depth++;
-      else if (css[j] === "}") depth--;
-      j++;
-    }
-    const block = css.slice(start, j);
-    const placeholder = `___MTC_PH_${out.length}___`;
-    out.push([placeholder, block]);
-    result += css.slice(idx, start) + placeholder;
-    idx = j;
-    startRegex.lastIndex = j;
-  }
-  result += css.slice(idx);
-  return result;
-}
-
-function scopeSelector(raw, scope) {
-  const s = raw.trim();
-  if (!s) return "";
-  if (s === "body" || s === "html" || s === ":root" || s === ".remarkable-preview") return scope;
-  if (s === "*") return `${scope} *`;
-  const rootMatch = s.match(/^(html\s+body|html|body|\.remarkable-preview)(?=[\s>+~:.#\[])/);
-  if (rootMatch) return scope + s.slice(rootMatch[0].length);
-  return `${scope} ${s}`;
-}
 
 function onContentChange(content) {
   if (suppressChange) return;
