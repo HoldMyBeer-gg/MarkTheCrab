@@ -1829,7 +1829,6 @@ function setupSettingsDialog() {
     Mascot.configure({ animations: on });
   });
 
-  document.getElementById("settings-close").onclick = () => dialog.close();
   document.getElementById("settings-done").onclick = () => dialog.close();
 }
 
