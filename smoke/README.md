@@ -44,6 +44,22 @@ bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
 5. `stop_recording` to `$SMOKE/<script name>.mp4`, quit the app, report
    PASS/FAIL per script with the failing step or check.
 
+### Phase extras
+
+- A `learn` entry may carry `only`, like a step: skip it on other platforms
+  (a skipped entry isn't a null-handle failure).
+- `"window": "<title pattern>"` (or a per-platform object) runs the phase
+  against that window instead of `$WINDOW`: `wait_for_window` it, then
+  `learn_layout` with its id. Native dialogs and MarkTheCrab's own prompts
+  (e.g. "Unsaved changes", "External changes") are separate windows.
+- `"id": "x"` names a phase; `{"repeat": "x"}` runs that phase again with a
+  fresh `learn_layout` (handles from the first pass are stale).
+- A phase with only `checks` runs them at that point in the flow, same rules
+  as the top-level `checks`.
+- `{"no_window": "<pattern>"}` → `list_windows` must show no window whose
+  name matches.
+- `wait_for_window`'s `pattern` may be a per-platform object.
+
 ## Conventions
 
 - Elements are found by accessible **name**, which is the same on every OS
@@ -60,9 +76,19 @@ bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
   it on the first run, drop the flag, and commit the delta. A script with no
   `confirm` left and a `verified` date per platform is fully trusted.
 - `note` fields are instructions for the runner, not steps.
-- `key` takes one key (`Return`, `Escape`, a single character). bad-ass-mcp
-  has no Ctrl/Cmd chords on macOS or Windows, so scripts use toolbar buttons
-  and menu items instead of shortcuts.
+- `key` takes one key (`Return`, `Escape`, `F10`, `Down`, a single
+  character). bad-ass-mcp has no Ctrl/Cmd chords on macOS or Windows, so
+  scripts use toolbar buttons and menu items instead of shortcuts.
+- **Windows:** a `key` with `window_id` is posted to the top-level window and
+  never reaches WebView2 page content. Send keys to our UI *without*
+  `window_id` (real input to the focused element), via `only: ["windows"]`
+  twins of the `window_id` steps.
+- **Windows:** the native menu bar's items are in the tree (role
+  `menuitem`), but a UIA invoke on `File` doesn't open its popup, and the
+  popup's items aren't under the window. Open menus with keys: `F10`, then
+  `Down` (opens the menu on its first item), more `Down`s, `Return`.
+- **Windows:** a `<select>` opens a native popup the tree can't see. Pick an
+  option with the `select` action instead of clicking.
 - Typing into the CodeMirror editor with `type`: works on Linux (the backend
   sends real keystrokes through xdotool to the focused element, which is how
   bad-ass-mcp's own MarkTheCrab demo is recorded); does nothing on macOS

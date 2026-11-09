@@ -5,6 +5,7 @@
     "windows",
     "linux"
   ],
+  "verified": { "windows": "2026-11-09" },
   "setup": [
     {
       "shell": "printf 'original\\n' > \"$SMOKE/style.md\""
@@ -18,186 +19,159 @@
   ],
   "variables": {
     "target_path": {
-      "windows": "Windows: $SMOKE\\STYLE.MD with backslashes and different case (e.g. upper-case the directory name too)",
+      "windows": "Windows: $SMOKE\\STYLE.MD with backslashes and different case (upper-case the directory name too, e.g. ...\\SMOKE-SUITE\\STYLE.MD)",
       "linux": "Linux: $SMOKE/sub/../style.md (Linux paths are case-sensitive, so use a '..' segment instead); setup must also mkdir $SMOKE/sub"
+    },
+    "reopen_path": {
+      "windows": "Windows: like $target_path plus a '.' segment (…\\SMOKE-SUITE\\.\\STYLE.MD). The Open dialog autocompletes a path it has seen back to its on-disk spelling, which would defeat the test; the extra segment keeps it misspelled.",
+      "linux": "Linux: $target_path"
     }
   },
   "phases": [
     {
-      "note": "Make tab A (style.md) dirty: the editor has focus after launch.",
+      "note": "Make tab A (style.md) dirty: the editor has focus after launch. Windows: keys without window_id (a key posted to the HWND doesn't reach WebView2).",
       "learn": {},
       "steps": [
-        {
-          "action": "key",
-          "key": "x",
-          "window_id": "$WINDOW"
-        },
-        {
-          "action": "sleep",
-          "seconds": 0.3
-        }
+        { "action": "key", "key": "x", "window_id": "$WINDOW", "only": ["linux"] },
+        { "action": "key", "key": "x", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3 }
       ]
     },
     {
       "learn": {
-        "new_tab": {
-          "name": "New tab"
-        }
+        "new_tab": { "name": "New tab" }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "new_tab"
-        },
-        {
-          "action": "key",
-          "key": "n",
-          "window_id": "$WINDOW"
-        },
-        {
-          "action": "key",
-          "key": "e",
-          "window_id": "$WINDOW"
-        },
-        {
-          "action": "key",
-          "key": "w",
-          "window_id": "$WINDOW"
-        },
-        {
-          "action": "sleep",
-          "seconds": 0.3
-        }
+        { "action": "click", "target": "new_tab" },
+        { "action": "key", "key": "n", "window_id": "$WINDOW", "only": ["linux"] },
+        { "action": "key", "key": "e", "window_id": "$WINDOW", "only": ["linux"] },
+        { "action": "key", "key": "w", "window_id": "$WINDOW", "only": ["linux"] },
+        { "action": "key", "key": "n", "only": ["windows"] },
+        { "action": "key", "key": "e", "only": ["windows"] },
+        { "action": "key", "key": "w", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3 }
       ]
     },
     {
+      "id": "open_save_as",
+      "note": "Windows: invoking the menu bar's File through UIA doesn't open it, so use real keys: F10 (File focused), Down (menu open on New Window), Down x5 to Save As (New Window, New Tab, Open..., Open Recent, Save, Save As...), Return.",
       "learn": {
-        "file_menu": {
-          "name": "File",
-          "role": {
-            "windows": "menu item",
-            "linux": "menu"
-          },
-          "confirm": true
-        }
+        "file_menu": { "name": "File", "role": "menu", "only": ["linux"], "confirm": true },
+        "save_as": { "name": "Save As...", "only": ["linux"], "confirm": true }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "file_menu"
-        },
-        {
-          "action": "wait_for_element",
-          "window_id": "$WINDOW",
-          "name": "Save As...",
-          "timeout": 3
-        }
+        { "action": "click", "target": "file_menu", "only": ["linux"] },
+        { "action": "click", "target": "save_as", "only": ["linux"] },
+        { "action": "key", "key": "F10", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Return", "only": ["windows"] },
+        { "action": "wait_for_window", "pattern": { "windows": "Save As", "linux": "Save" }, "timeout": 5 }
       ]
     },
     {
+      "id": "save_dialog",
+      "window": { "windows": "Save As", "linux": "Save" },
+      "note": "Native Save dialog, learned in its own window. Windows has three elements named 'File name:' (label, combobox, edit), so the field needs role 'textfield'.",
       "learn": {
-        "save_as": {
-          "name": "Save As..."
-        }
+        "name_field": { "name": { "windows": "File name:", "linux": "Name" }, "role": { "windows": "textfield" } },
+        "save_button": { "name": "Save", "role": { "windows": "button" } }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "save_as"
-        },
-        {
-          "action": "sleep",
-          "seconds": 1.5
-        }
+        { "action": "type", "target": "name_field", "text": "$target_path" },
+        { "action": "click", "target": "save_button" },
+        { "action": "sleep", "seconds": 1 },
+        { "action": "wait_for_window", "pattern": { "windows": "Confirm Save As", "linux": "Save" }, "timeout": 5 }
       ]
     },
     {
-      "note": "Native Save dialog. It's a separate window: find it with list_windows / wait_for_window and use its id for learn_layout. Type $target_path into the file name field, then Save.",
+      "id": "os_replace",
+      "window": { "windows": "Confirm Save As", "linux": "Save" },
+      "note": "OS replace prompt (Windows 'Confirm Save As' → Yes; GTK → Replace). Then MarkTheCrab's own prompt, a separate window titled 'Unsaved changes'.",
       "learn": {
-        "name_field": {
-          "name": {
-            "windows": "File name:",
-            "linux": "Name"
-          },
-          "confirm": true
-        },
-        "save_button": {
-          "name": "Save",
-          "confirm": true
-        }
+        "os_replace": { "name": { "windows": "Yes", "linux": "Replace" }, "role": { "windows": "button" } }
       },
       "steps": [
-        {
-          "action": "type",
-          "target": "name_field",
-          "text": "$target_path"
-        },
-        {
-          "action": "click",
-          "target": "save_button"
-        },
-        {
-          "action": "sleep",
-          "seconds": 1
-        }
+        { "action": "click", "target": "os_replace" },
+        { "action": "wait_for_window", "pattern": "Unsaved changes", "timeout": 5 }
       ]
     },
     {
-      "note": "OS replace prompt (Windows 'Confirm Save As' → Yes; GTK → Replace). Then MarkTheCrab's own prompt must appear: CANCEL it first.",
+      "window": "Unsaved changes",
       "learn": {
-        "os_replace": {
-          "name": {
-            "windows": "Yes",
-            "linux": "Replace"
-          },
-          "confirm": true
-        }
+        "mtc_cancel": { "name": "Cancel", "role": { "windows": "button" } }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "os_replace"
-        },
-        {
-          "action": "wait_for_element",
-          "window_id": null,
-          "name": "Cancel",
-          "timeout": 5,
-          "confirm": true
-        }
+        { "action": "click", "target": "mtc_cancel" },
+        { "action": "sleep", "seconds": 1 }
       ]
     },
     {
+      "note": "Cancel wrote nothing and both tabs survive. A selected tab's name includes its close button ('style.md Close style.md'), an unselected one doesn't, so tab checks match on the tab role and a name prefix.",
+      "checks": [
+        { "shell": "grep -qx 'original' \"$SMOKE/style.md\"" },
+        { "present": { "name": "style.md", "role": { "windows": "tabitem" } } }
+      ]
+    },
+    { "repeat": "open_save_as" },
+    { "repeat": "save_dialog" },
+    { "repeat": "os_replace" },
+    {
+      "window": "Unsaved changes",
       "learn": {
-        "mtc_cancel": {
-          "name": "Cancel"
-        }
+        "mtc_replace": { "name": "Replace", "role": { "windows": "button" } }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "mtc_cancel"
-        },
-        {
-          "action": "sleep",
-          "seconds": 1
-        }
+        { "action": "click", "target": "mtc_replace" },
+        { "action": "sleep", "seconds": 5 }
+      ]
+    },
+    {
+      "note": "Replace wrote the new tab's text, closed tab A, and no 'modified outside' prompt followed within 5 s.",
+      "checks": [
+        { "shell": "grep -q 'new' \"$SMOKE/style.md\"" },
+        { "no_window": "External changes" }
+      ]
+    },
+    {
+      "note": "Reopen under another spelling from a fresh tab. Windows: the Open dialog's 'Open' is a split button whose UIA invoke doesn't open the file; press Return in the name field instead (real key, no window_id).",
+      "learn": {
+        "new_tab": { "name": "New tab" },
+        "open_file": { "name": "Open file" }
+      },
+      "steps": [
+        { "action": "click", "target": "new_tab" },
+        { "action": "sleep", "seconds": 0.3 },
+        { "action": "click", "target": "open_file" },
+        { "action": "wait_for_window", "pattern": { "windows": "Open", "linux": "Open" }, "timeout": 5 }
+      ]
+    },
+    {
+      "window": { "windows": "Open", "linux": "Open" },
+      "learn": {
+        "name_field": { "name": { "windows": "File name:", "linux": "Name" }, "role": { "windows": "textfield" } }
+      },
+      "steps": [
+        { "action": "click", "target": "name_field", "only": ["windows"] },
+        { "action": "type", "target": "name_field", "text": "$reopen_path" },
+        { "action": "key", "key": "Return", "only": ["windows"] },
+        { "action": "key", "key": "Return", "window_id": "$WINDOW", "only": ["linux"] },
+        { "action": "sleep", "seconds": 1.5 }
       ]
     }
   ],
   "checks": [
+    { "windows": 1 },
     {
-      "shell": "grep -qx 'original' \"$SMOKE/style.md\""
-    },
-    {
-      "manual": "Both tabs are still open (find_elements name 'style.md' ≥ 1 and the Untitled tab). Then repeat the Save As phases, answering MarkTheCrab's prompt with 'Replace' instead of Cancel."
-    },
-    {
-      "manual": "After Replace: grep -q 'new' $SMOKE/style.md; only one tab named style.md; wait 5 s and find_elements name 'External changes' returns 0 (no 'modified outside' prompt)."
-    },
-    {
-      "manual": "Toolbar 'Open file', open $target_path again: no new tab appears; the existing style.md tab is active."
+      "manual": "Exactly two tabs (find_elements role 'tabitem' on Windows): one whose name starts with 'style.md' and is 'selected', and 'Untitled' unselected. No third tab."
     }
   ],
-  "notes": "First full run will need the native-dialog names confirmed and the manual checks turned into phases where the tool allows it. The prompt's buttons come from MarkTheCrab's ask() (okLabel 'Replace', cancelLabel 'Cancel'), so those two names are ours and stable."
+  "notes": "Windows run 2026-11-09 confirmed every native-dialog name above. Linux dialog titles and names ('Save', 'Name', 'Replace', 'Open', the File menu role) still come from docs: confirm them on the first Linux run. The MarkTheCrab prompt's buttons come from ask() (okLabel 'Replace', cancelLabel 'Cancel'), so those names are ours and stable."
 }

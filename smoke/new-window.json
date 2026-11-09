@@ -5,50 +5,42 @@
     "windows",
     "linux"
   ],
+  "verified": { "windows": "2026-11-09" },
   "setup": [],
   "launch": [],
   "phases": [
     {
+      "note": "Windows: the native menu bar's 'File' is in the tree (role 'menuitem'), but invoking it through UIA doesn't open the popup, and the popup's items aren't under the window. So Windows opens the menu with real keys: F10 focuses the menu bar on File, Down opens it with the first item (New Window) highlighted, Return activates it. Keys go without window_id so they're real input.",
       "learn": {
         "file_menu": {
           "name": "File",
-          "role": {
-            "windows": "menu item",
-            "linux": "menu"
-          },
+          "role": "menu",
+          "only": ["linux"],
           "confirm": true
         }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "file_menu"
-        },
-        {
-          "action": "wait_for_element",
-          "window_id": "$WINDOW",
-          "name": "New Window",
-          "timeout": 3,
-          "confirm": true
-        }
+        { "action": "click", "target": "file_menu", "only": ["linux"] },
+        { "action": "wait_for_element", "window_id": "$WINDOW", "name": "New Window", "timeout": 3, "only": ["linux"], "confirm": true },
+        { "action": "key", "key": "F10", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Return", "only": ["windows"] },
+        { "action": "sleep", "seconds": 3, "only": ["windows"] }
       ]
     },
     {
       "learn": {
         "new_window": {
           "name": "New Window",
+          "only": ["linux"],
           "confirm": true
         }
       },
       "steps": [
-        {
-          "action": "click",
-          "target": "new_window"
-        },
-        {
-          "action": "sleep",
-          "seconds": 3
-        }
+        { "action": "click", "target": "new_window", "only": ["linux"] },
+        { "action": "sleep", "seconds": 3, "only": ["linux"] }
       ]
     }
   ],
@@ -57,8 +49,8 @@
       "windows": 2
     },
     {
-      "manual": "In the NEW window (list_windows, the one that isn't $WINDOW): find_elements name 'Insert emoji' returns ≥ 1 (it loaded, not blank white). Then click its close button (UIA name 'Close' on Windows; on Linux the window manager's close button, or xdotool windowclose if it isn't in the tree) once and check list_windows shows 1 MarkTheCrab window within 3 s."
+      "manual": "In the NEW window (list_windows, the one that isn't $WINDOW): learn_layout {'emoji': {'name': 'Insert emoji'}, 'close': {'name': 'Close', 'role': {'windows': 'button'}}} and both resolve (it loaded, not blank white). Click 'close' once (on Linux the window manager's close button, or xdotool windowclose if it isn't in the tree) and check list_windows shows 1 MarkTheCrab window within 3 s. Windows: verified with exactly these names."
     }
   ],
-  "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the menu needs its role. Roles marked confirm come from docs: fix them on first run."
+  "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the Linux menu lookup needs its role. Linux names/roles marked confirm come from docs: fix them on the first Linux run."
 }
