@@ -27,7 +27,7 @@
       "linux": "$SMOKE/sub/../style.md"
     }
   },
-  "variables_note": "Literal values; $SMOKE expands inside them. target_path is another spelling of $SMOKE/style.md: Windows uses backslashes and different case (upper-case the directory name too if you like), Linux paths are case-sensitive so it uses a '..' segment (setup mkdirs $SMOKE/sub for it). reopen_path on Windows adds a '.' segment because the Open dialog autocompletes a path it has seen back to its on-disk spelling, which would defeat the test.",
+  "variables_note": "Literal values; $SMOKE expands inside them. target_path is another spelling of $SMOKE/style.md: Windows uses backslashes and different case (upper-case the directory name too if you like), Linux paths are case-sensitive so it uses a '..' segment (setup mkdirs $SMOKE/sub for it). reopen_path on Windows adds a '.' segment because the Open dialog autocompletes a path it has seen back to its on-disk spelling, which would defeat the test. On Windows $SMOKE must be in C:\\ form (backslashes, drive letter), since it is typed into native dialogs: if you set it in Git Bash, use cygpath -w.",
   "phases": [
     {
       "note": "Make tab A (style.md) dirty: the editor has focus after launch. Windows: keys without window_id (a key posted to the HWND doesn't reach WebView2).",
