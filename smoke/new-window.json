@@ -1,0 +1,64 @@
+{
+  "name": "new-window",
+  "covers": "File > New Window opens a second, fully loaded window that closes on the first click (Windows deadlock fixed in c4d9c5e). Ctrl+N goes through the same new_window command, but bad-ass-mcp can't send chords on macOS/Windows, so the menu path stands in for it. macOS is skipped: its menu bar belongs to the app, not the window, so window-scoped lookups can't reach it.",
+  "platforms": [
+    "windows",
+    "linux"
+  ],
+  "setup": [],
+  "launch": [],
+  "phases": [
+    {
+      "learn": {
+        "file_menu": {
+          "name": "File",
+          "role": {
+            "windows": "menu item",
+            "linux": "menu"
+          },
+          "confirm": true
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "file_menu"
+        },
+        {
+          "action": "wait_for_element",
+          "window_id": "$WINDOW",
+          "name": "New Window",
+          "timeout": 3,
+          "confirm": true
+        }
+      ]
+    },
+    {
+      "learn": {
+        "new_window": {
+          "name": "New Window",
+          "confirm": true
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "new_window"
+        },
+        {
+          "action": "sleep",
+          "seconds": 3
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "windows": 2
+    },
+    {
+      "manual": "In the NEW window (list_windows, the one that isn't $WINDOW): find_elements name 'Insert emoji' returns ≥ 1 (it loaded, not blank white). Then click its close button (UIA name 'Close' on Windows; on Linux the window manager's close button, or xdotool windowclose if it isn't in the tree) once and check list_windows shows 1 MarkTheCrab window within 3 s."
+    }
+  ],
+  "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the menu needs its role. Roles marked confirm come from docs: fix them on first run."
+}

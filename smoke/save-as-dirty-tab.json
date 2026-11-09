@@ -1,0 +1,203 @@
+{
+  "name": "save-as-dirty-tab",
+  "covers": "Save As onto a file another tab has open with unsaved edits, spelled differently (case, separators): MarkTheCrab asks Replace/Cancel after the OS replace prompt. Cancel writes nothing; Replace writes, closes the old tab, and no 'modified outside' prompt follows (44c443a). Also: opening the same file under another spelling switches to its tab.",
+  "platforms": [
+    "windows",
+    "linux"
+  ],
+  "setup": [
+    {
+      "shell": "printf 'original\\n' > \"$SMOKE/style.md\""
+    },
+    {
+      "shell": "mkdir -p \"$SMOKE/sub\""
+    }
+  ],
+  "launch": [
+    "style.md"
+  ],
+  "variables": {
+    "target_path": {
+      "windows": "Windows: $SMOKE\\STYLE.MD with backslashes and different case (e.g. upper-case the directory name too)",
+      "linux": "Linux: $SMOKE/sub/../style.md (Linux paths are case-sensitive, so use a '..' segment instead); setup must also mkdir $SMOKE/sub"
+    }
+  },
+  "phases": [
+    {
+      "note": "Make tab A (style.md) dirty: the editor has focus after launch.",
+      "learn": {},
+      "steps": [
+        {
+          "action": "key",
+          "key": "x",
+          "window_id": "$WINDOW"
+        },
+        {
+          "action": "sleep",
+          "seconds": 0.3
+        }
+      ]
+    },
+    {
+      "learn": {
+        "new_tab": {
+          "name": "New tab"
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "new_tab"
+        },
+        {
+          "action": "key",
+          "key": "n",
+          "window_id": "$WINDOW"
+        },
+        {
+          "action": "key",
+          "key": "e",
+          "window_id": "$WINDOW"
+        },
+        {
+          "action": "key",
+          "key": "w",
+          "window_id": "$WINDOW"
+        },
+        {
+          "action": "sleep",
+          "seconds": 0.3
+        }
+      ]
+    },
+    {
+      "learn": {
+        "file_menu": {
+          "name": "File",
+          "role": {
+            "windows": "menu item",
+            "linux": "menu"
+          },
+          "confirm": true
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "file_menu"
+        },
+        {
+          "action": "wait_for_element",
+          "window_id": "$WINDOW",
+          "name": "Save As...",
+          "timeout": 3
+        }
+      ]
+    },
+    {
+      "learn": {
+        "save_as": {
+          "name": "Save As..."
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "save_as"
+        },
+        {
+          "action": "sleep",
+          "seconds": 1.5
+        }
+      ]
+    },
+    {
+      "note": "Native Save dialog. It's a separate window: find it with list_windows / wait_for_window and use its id for learn_layout. Type $target_path into the file name field, then Save.",
+      "learn": {
+        "name_field": {
+          "name": {
+            "windows": "File name:",
+            "linux": "Name"
+          },
+          "confirm": true
+        },
+        "save_button": {
+          "name": "Save",
+          "confirm": true
+        }
+      },
+      "steps": [
+        {
+          "action": "type",
+          "target": "name_field",
+          "text": "$target_path"
+        },
+        {
+          "action": "click",
+          "target": "save_button"
+        },
+        {
+          "action": "sleep",
+          "seconds": 1
+        }
+      ]
+    },
+    {
+      "note": "OS replace prompt (Windows 'Confirm Save As' → Yes; GTK → Replace). Then MarkTheCrab's own prompt must appear: CANCEL it first.",
+      "learn": {
+        "os_replace": {
+          "name": {
+            "windows": "Yes",
+            "linux": "Replace"
+          },
+          "confirm": true
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "os_replace"
+        },
+        {
+          "action": "wait_for_element",
+          "window_id": null,
+          "name": "Cancel",
+          "timeout": 5,
+          "confirm": true
+        }
+      ]
+    },
+    {
+      "learn": {
+        "mtc_cancel": {
+          "name": "Cancel"
+        }
+      },
+      "steps": [
+        {
+          "action": "click",
+          "target": "mtc_cancel"
+        },
+        {
+          "action": "sleep",
+          "seconds": 1
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "shell": "grep -qx 'original' \"$SMOKE/style.md\""
+    },
+    {
+      "manual": "Both tabs are still open (find_elements name 'style.md' ≥ 1 and the Untitled tab). Then repeat the Save As phases, answering MarkTheCrab's prompt with 'Replace' instead of Cancel."
+    },
+    {
+      "manual": "After Replace: grep -q 'new' $SMOKE/style.md; only one tab named style.md; wait 5 s and find_elements name 'External changes' returns 0 (no 'modified outside' prompt)."
+    },
+    {
+      "manual": "Toolbar 'Open file', open $target_path again: no new tab appears; the existing style.md tab is active."
+    }
+  ],
+  "notes": "First full run will need the native-dialog names confirmed and the manual checks turned into phases where the tool allows it. The prompt's buttons come from MarkTheCrab's ask() (okLabel 'Replace', cancelLabel 'Cancel'), so those two names are ours and stable."
+}
