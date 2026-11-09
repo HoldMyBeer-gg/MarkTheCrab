@@ -96,3 +96,49 @@ bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
   Windows. Scripts preload documents with `setup` + `launch` and use
   single-character `key` steps, which work everywhere.
 - macOS opens its own emoji palette, so emoji-picker scripts skip `macos`.
+- `only` works on checks too, and a `window` / `wait_for_window` pattern given
+  per platform may be `null`: the phase then runs against `$WINDOW` and the
+  wait is skipped. Linux needs this (see below).
+- A learn entry (or a `present`/`absent` check) may add `"state": "focused"`
+  / `"selected"` (per platform if needed): take the first `find_elements`
+  match that carries that AT state. Needed where a native widget has no
+  accessible name (GTK's file chooser name entry).
+- `"count": n` on a `present` check asserts exactly n matches (default ≥ 1).
+- `variables` hold per-platform literals (`$SMOKE` expands inside them);
+  `$name` is substituted in `text`, `shell` and `cmd` fields. Explanations go
+  in `variables_note`.
+- `{"action": "shell", "cmd": "..."}` runs a shell command as a step, for
+  `only`-gated platform glue (xdotool on Linux), never for the flow itself.
+
+## Linux notes (SteamOS / KDE Wayland, WebKitGTK 2.54, run 2026-11-09)
+
+- `smoke/runner.py` executes the steps above through bad-ass-mcp's own
+  functions in-process (see its header; it needs the bad-ass-mcp venv's
+  Python for `gi`). The app runs with `GDK_BACKEND=x11` so xdotool works.
+  It also records: ffmpeg x11grab (bad-ass-mcp's `start_recording`) is black
+  under Wayland, so the runner takes compositor screenshots between steps
+  and writes `<script>.mp4` (2 fps, cropped to the window).
+- Roles: the menu bar's `File` is AT-SPI `menu`; tabs are `page tab` in a
+  `page tab list` named "Open documents"; the active tab carries the
+  `selected` state.
+- `<select>` dropdowns: don't `click` the option. WebKitGTK leaves the native
+  popup open and it swallows every keystroke after it. Use `select`.
+- Menus: give the popup a beat (0.5 s) after opening it before activating an
+  item; an immediate activation is lost.
+- **Native dialogs are not separate windows on Linux.** GTK's file chooser is
+  a `file chooser` child of the app itself ("Save File" / "Open File"), and
+  MarkTheCrab's own prompts ("Unsaved changes", "External changes") are
+  in-page dialogs. `list_windows` never shows them, so `window` and
+  `wait_for_window` patterns are `null` for Linux and the checks use
+  `absent` instead of `no_window`. The Save dialog's name entry is an unnamed
+  `text` with the `focused` state; its `Save` button shares its name with the
+  toolbar's, so confirm with Return. The Open dialog has no name entry until
+  Ctrl+L. GTK's replace prompt button is `Replace`.
+- Windows count: AT-SPI lists one application per process; each window is a
+  `frame` under it, so `{"windows": n}` counts frames.
+- bad-ass-mcp's Linux backend needed three fixes for these scripts to drive
+  WebKitGTK at all; they live in that repo: XTEST keys instead of
+  `xdotool key --window` (GTK drops the synthetic events), XTEST typing with
+  select-all instead of `EditableText.set_text_contents` (it fires no DOM
+  input events, so filtering never runs), and `--onlyvisible` when picking
+  the X window to activate (GTK keeps closed dialogs' windows around unmapped).

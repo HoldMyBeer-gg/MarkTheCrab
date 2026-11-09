@@ -5,23 +5,23 @@
     "windows",
     "linux"
   ],
-  "verified": { "windows": "2026-11-09" },
+  "verified": { "windows": "2026-11-09", "linux": "2026-11-09" },
   "setup": [],
   "launch": [],
   "phases": [
     {
-      "note": "Windows: the native menu bar's 'File' is in the tree (role 'menuitem'), but invoking it through UIA doesn't open the popup, and the popup's items aren't under the window. So Windows opens the menu with real keys: F10 focuses the menu bar on File, Down opens it with the first item (New Window) highlighted, Return activates it. Keys go without window_id so they're real input.",
+      "note": "Windows: the native menu bar's 'File' is in the tree (role 'menuitem'), but invoking it through UIA doesn't open the popup, and the popup's items aren't under the window. So Windows opens the menu with real keys: F10 focuses the menu bar on File, Down opens it with the first item (New Window) highlighted, Return activates it. Keys go without window_id so they're real input. Linux: the menu bar's File is an AT-SPI 'menu' (confirmed); give the popup a beat before activating its item, or the activation is lost.",
       "learn": {
         "file_menu": {
           "name": "File",
           "role": "menu",
-          "only": ["linux"],
-          "confirm": true
+          "only": ["linux"]
         }
       },
       "steps": [
         { "action": "click", "target": "file_menu", "only": ["linux"] },
-        { "action": "wait_for_element", "window_id": "$WINDOW", "name": "New Window", "timeout": 3, "only": ["linux"], "confirm": true },
+        { "action": "wait_for_element", "window_id": "$WINDOW", "name": "New Window", "timeout": 3, "only": ["linux"] },
+        { "action": "sleep", "seconds": 0.5, "only": ["linux"] },
         { "action": "key", "key": "F10", "only": ["windows"] },
         { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
         { "action": "key", "key": "Down", "only": ["windows"] },
@@ -34,8 +34,7 @@
       "learn": {
         "new_window": {
           "name": "New Window",
-          "only": ["linux"],
-          "confirm": true
+          "only": ["linux"]
         }
       },
       "steps": [
@@ -49,8 +48,19 @@
       "windows": 2
     },
     {
+      "present": { "name": "Insert emoji", "count": 2 },
+      "only": ["linux"],
+      "note": "Both windows expose a toolbar: the new one loaded, it isn't blank white. On Linux both frames live under one AT-SPI application, so one lookup sees both."
+    },
+    {
+      "shell": "new=$(xdotool getactivewindow); xdotool getwindowclassname \"$new\" | grep -qi markthecrab || exit 2; xdotool windowclose \"$new\"; for i in 1 2 3 4 5 6; do sleep 0.5; n=0; for w in $(xdotool search --onlyvisible --class markthecrab); do xprop -id \"$w\" _NET_WM_WINDOW_TYPE | grep -q NORMAL && n=$((n+1)); done; [ \"$n\" -eq 1 ] && exit 0; done; exit 1",
+      "only": ["linux"],
+      "note": "The new window is the active one. Close it with the window manager (its close button isn't in the a11y tree) and expect one normal MarkTheCrab window within 3 s (popups and tooltips share the class, so count only NORMAL-type windows)."
+    },
+    {
+      "only": ["windows"],
       "manual": "In the NEW window (list_windows, the one that isn't $WINDOW): learn_layout {'emoji': {'name': 'Insert emoji'}, 'close': {'name': 'Close', 'role': {'windows': 'button'}}} and both resolve (it loaded, not blank white). Click 'close' once (on Linux the window manager's close button, or xdotool windowclose if it isn't in the tree) and check list_windows shows 1 MarkTheCrab window within 3 s. Windows: verified with exactly these names."
     }
   ],
-  "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the Linux menu lookup needs its role. Linux names/roles marked confirm come from docs: fix them on the first Linux run."
+  "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the Linux menu lookup needs its role. Linux names/roles confirmed on the 2026-11-09 run; `windows` counts AT-SPI frames there."
 }

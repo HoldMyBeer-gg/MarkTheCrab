@@ -2,7 +2,7 @@
   "name": "emoji-picker",
   "covers": "In-app emoji picker (0710976): search + Enter inserts at the cursor and the file saves with it; Escape from the search box with text closes without inserting (5914c34). macOS opens its native palette instead, so it's skipped there.",
   "platforms": ["windows", "linux"],
-  "verified": { "windows": "2026-11-09" },
+  "verified": { "windows": "2026-11-09", "linux": "2026-11-09" },
   "setup": [
     { "shell": "printf 'hello ' > \"$SMOKE/emoji.md\"" }
   ],

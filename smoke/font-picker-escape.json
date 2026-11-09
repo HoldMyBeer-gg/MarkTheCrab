@@ -2,7 +2,7 @@
   "name": "font-picker-escape",
   "covers": "Settings > Preview font > Choose a font…: search, then Escape from inside the search box closes only the chooser and restores the dropdown (5914c34).",
   "platforms": ["macos", "windows", "linux"],
-  "verified": { "macos": "2026-11-09", "windows": "2026-11-09" },
+  "verified": { "macos": "2026-11-09", "windows": "2026-11-09", "linux": "2026-11-09" },
   "setup": [],
   "launch": [],
   "phases": [
@@ -14,23 +14,23 @@
       ]
     },
     {
-      "note": "On Windows the name 'Preview font' also matches the label text (role 'text'), so the combobox needs its role. Clicking the <select> there opens a native popup the tree can't see, so Windows picks the option with 'select' instead.",
+      "note": "On Windows the name 'Preview font' also matches the label text (role 'text'), so the combobox needs its role. Clicking the <select> there opens a native popup the tree can't see; on Linux (WebKitGTK) the click leaves the native popup open and it swallows every keystroke meant for the chooser. Both pick the option with 'select' instead; macOS clicks.",
       "learn": { "preview_font": { "name": "Preview font", "role": { "windows": "combobox" } } },
       "steps": [
         { "action": "get_value", "target": "preview_font", "save": "before" },
-        { "action": "click", "target": "preview_font", "only": ["macos", "linux"] },
-        { "action": "wait_for_element", "window_id": "$WINDOW", "name": "Choose a font…", "timeout": 3, "only": ["macos", "linux"] }
+        { "action": "click", "target": "preview_font", "only": ["macos"] },
+        { "action": "wait_for_element", "window_id": "$WINDOW", "name": "Choose a font…", "timeout": 3, "only": ["macos"] }
       ]
     },
     {
-      "note": "On Windows 'Choose a font…' is an <option> inside the closed select and isn't in the tree, so it's learned on macOS/Linux only and Windows reuses preview_font.",
+      "note": "On Windows 'Choose a font…' is an <option> inside the closed select and isn't in the tree, so it's learned on macOS only and Windows/Linux reuse preview_font.",
       "learn": {
-        "choose": { "name": "Choose a font…", "only": ["macos", "linux"] },
-        "preview_font": { "name": "Preview font", "role": { "windows": "combobox" }, "only": ["windows"] }
+        "choose": { "name": "Choose a font…", "only": ["macos"] },
+        "preview_font": { "name": "Preview font", "role": { "windows": "combobox" }, "only": ["windows", "linux"] }
       },
       "steps": [
-        { "action": "click", "target": "choose", "only": ["macos", "linux"] },
-        { "action": "select", "target": "preview_font", "value": "Choose a font…", "only": ["windows"] },
+        { "action": "click", "target": "choose", "only": ["macos"] },
+        { "action": "select", "target": "preview_font", "value": "Choose a font…", "only": ["windows", "linux"] },
         { "action": "wait_for_element", "window_id": "$WINDOW", "name": "Search fonts", "timeout": 5 }
       ]
     },
