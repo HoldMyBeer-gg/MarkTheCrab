@@ -31,6 +31,14 @@ pub fn render_markdown(text: &str) -> String {
     markdown_core::render_markdown(text)
 }
 
+/// `[html, css]`: the preview HTML and the CSS from the document's own
+/// `<style>` blocks, which the frontend scopes to the preview.
+#[tauri::command]
+pub fn render_document(text: &str) -> (String, String) {
+    let doc = markdown_core::render_document(text);
+    (doc.html, doc.css)
+}
+
 // Lets the frontend branch its file UI by target. iOS has no native
 // save-as path picker and a sandboxed filesystem, so it swaps in an in-app
 // filename prompt and writes into the app's Documents directory instead.

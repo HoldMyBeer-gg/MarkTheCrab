@@ -9,7 +9,22 @@ use std::collections::HashMap;
 /// - ~subscript~ → <sub>subscript</sub>
 /// - [ ] / [x] → checkbox HTML
 /// - [TOC] or [[_TOC_]] → nested list of document headings
+///
+/// `<style>` blocks are dropped; use [`render_document`] to get them.
 pub fn render_markdown(input: &str) -> String {
+    render_document(input).html
+}
+
+/// A rendered document: sanitized HTML plus the CSS from the document's own
+/// `<style>` blocks, joined in order. The CSS is untrusted; callers must
+/// scope it before applying it next to their own UI.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RenderedDocument {
+    pub html: String,
+    pub css: String,
+}
+
+pub fn render_document(input: &str) -> RenderedDocument {
     // Mask fenced/inline code so their contents don't get eaten by the
     // `==highlight==` / `^sup^` / `~sub~` preprocessors.
     let mut code_sidebar: Vec<String> = Vec::new();
@@ -63,6 +78,10 @@ pub fn render_markdown(input: &str) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, events.into_iter());
 
+    // Lift out the document's <style> blocks. Code and math are still
+    // escaped or masked at this point, so only real raw-HTML styles match.
+    let (html_output, css) = extract_style_blocks(&html_output);
+
     // Restore math delimiters in the generated HTML. The frontend's KaTeX
     // auto-render pass then finds `$...$` / `$$...$$` and renders it.
     let html_output = restore_sentinels(&html_output, &math_sidebar, MATH_OPEN, MATH_CLOSE);
@@ -71,7 +90,51 @@ pub fn render_markdown(input: &str) -> String {
     let html_output = postprocess_custom_html(&html_output);
 
     // Sanitize with ammonia — allow safe HTML only
-    sanitize_html(&html_output)
+    RenderedDocument {
+        html: sanitize_html(&html_output),
+        css,
+    }
+}
+
+/// Remove every `<style …>…</style>` from `html`, returning the HTML without
+/// them and their contents joined by newlines. Tag names match ignoring
+/// case; an unclosed block runs to the end of the input.
+fn extract_style_blocks(html: &str) -> (String, String) {
+    let lower = html.to_ascii_lowercase(); // same byte offsets as `html`
+    let mut out = String::with_capacity(html.len());
+    let mut css = Vec::new();
+    let mut pos = 0;
+    while let Some(rel) = lower[pos..].find("<style") {
+        let start = pos + rel;
+        let after_name = start + "<style".len();
+        let next = lower.as_bytes().get(after_name).copied();
+        if !matches!(next, Some(b'>' | b' ' | b'\t' | b'\n' | b'\r' | b'/')) {
+            // `<styles>` or similar: not a style tag.
+            out.push_str(&html[pos..after_name]);
+            pos = after_name;
+            continue;
+        }
+        out.push_str(&html[pos..start]);
+        let Some(open_end) = lower[after_name..].find('>').map(|i| after_name + i + 1) else {
+            pos = html.len();
+            break;
+        };
+        match lower[open_end..].find("</style") {
+            Some(i) => {
+                let close = open_end + i;
+                css.push(html[open_end..close].to_string());
+                pos = lower[close..]
+                    .find('>')
+                    .map_or(html.len(), |j| close + j + 1);
+            }
+            None => {
+                css.push(html[open_end..].to_string());
+                pos = html.len();
+            }
+        }
+    }
+    out.push_str(&html[pos..]);
+    (out, css.join("\n"))
 }
 
 // Sentinel characters in the Unicode Private Use Area — chosen so they
@@ -828,16 +891,24 @@ fn sanitize_html_inner(html: &str) -> String {
             "var",
         ])
         .add_tag_attributes("a", &["href", "title", "target", "class", "data-src-line"])
-        .add_tag_attributes("h1", &["id"])
-        .add_tag_attributes("h2", &["id"])
-        .add_tag_attributes("h3", &["id"])
-        .add_tag_attributes("h4", &["id"])
-        .add_tag_attributes("h5", &["id"])
-        .add_tag_attributes("h6", &["id"])
-        .add_tag_attributes("img", &["src", "alt", "title", "width", "height"])
+        .add_tag_attributes("h1", &["id", "class"])
+        .add_tag_attributes("h2", &["id", "class"])
+        .add_tag_attributes("h3", &["id", "class"])
+        .add_tag_attributes("h4", &["id", "class"])
+        .add_tag_attributes("h5", &["id", "class"])
+        .add_tag_attributes("h6", &["id", "class"])
+        // Classes are for the document's own <style> rules, which the app
+        // scopes to the preview pane.
+        .add_tag_attributes("p", &["class"])
+        .add_tag_attributes("blockquote", &["class"])
+        .add_tag_attributes("ul", &["class"])
+        .add_tag_attributes("ol", &["class"])
+        .add_tag_attributes("table", &["class"])
+        .add_tag_attributes("tr", &["class"])
+        .add_tag_attributes("img", &["src", "alt", "title", "width", "height", "class"])
         .add_tag_attributes("input", &["type", "checked", "disabled"])
-        .add_tag_attributes("td", &["align", "colspan", "rowspan"])
-        .add_tag_attributes("th", &["align", "colspan", "rowspan"])
+        .add_tag_attributes("td", &["align", "colspan", "rowspan", "class"])
+        .add_tag_attributes("th", &["align", "colspan", "rowspan", "class"])
         .add_tag_attributes("code", &["class"])
         .add_tag_attributes("pre", &["class"])
         .add_tag_attributes("li", &["class"])
@@ -1001,6 +1072,63 @@ mod tests {
             !result.contains("href=\"data:"),
             "data: link target must be stripped: {result}"
         );
+    }
+
+    #[test]
+    fn document_style_blocks_come_back_as_css_not_html() {
+        let doc = render_document(
+            "<style>\n.red { color: red }\n</style>\n\nHi <span class=\"red\">there</span>",
+        );
+        assert!(
+            doc.css.contains(".red { color: red }"),
+            "css: {:?}",
+            doc.css
+        );
+        assert!(!doc.html.contains("<style"), "html: {}", doc.html);
+        assert!(!doc.html.contains("color: red"), "html: {}", doc.html);
+        assert!(
+            doc.html.contains(r#"<span class="red">there</span>"#),
+            "html: {}",
+            doc.html
+        );
+    }
+
+    #[test]
+    fn several_style_blocks_are_joined_in_order() {
+        let doc = render_document(
+            "<style>a { x: 1 }</style>\n\ntext\n\n<STYLE media=\"all\">b { y: 2 }</STYLE>",
+        );
+        let a = doc.css.find("a { x: 1 }").expect("first block");
+        let b = doc.css.find("b { y: 2 }").expect("second block");
+        assert!(a < b);
+    }
+
+    #[test]
+    fn style_inside_code_is_text_not_css() {
+        let doc = render_document(
+            "```html\n<style>p { color: red }</style>\n```\n\n`<style>q{}</style>`",
+        );
+        assert_eq!(doc.css, "");
+        assert!(doc.html.contains("&lt;style&gt;"), "html: {}", doc.html);
+    }
+
+    #[test]
+    fn render_markdown_still_drops_style() {
+        let html = render_markdown("<style>p { color: red }</style>\n\ntext");
+        assert!(
+            !html.contains("<style") && !html.contains("color: red"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn classes_survive_on_common_block_tags() {
+        let html = render_markdown(
+            r#"<p class="note">a</p><blockquote class="tip">b</blockquote><h2 class="x">c</h2>"#,
+        );
+        assert!(html.contains(r#"<p class="note">"#), "{html}");
+        assert!(html.contains(r#"<blockquote class="tip">"#), "{html}");
+        assert!(html.contains(r#"class="x""#), "{html}");
     }
 
     #[test]

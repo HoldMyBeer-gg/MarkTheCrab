@@ -216,6 +216,13 @@ async function createBrowserApi() {
       case "render_markdown":
         return wasm.renderMarkdown(args.text ?? "");
 
+      case "render_document": {
+        const doc = wasm.renderDocument(args.text ?? "");
+        const out = [doc.html, doc.css];
+        doc.free();
+        return out;
+      }
+
       case "platform":
         return "browser";
 

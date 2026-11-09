@@ -8,6 +8,7 @@ window.hljs = hljs;
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
+import { scopeDocumentCss } from "./doc-css.js";
 import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies, previewFontCss } from "./fonts.js";
 import { saveTab, saveTabAs, reloadTab, statAll, createPauseGate, wrapDialogs } from "./tab-io.js";
 
@@ -596,9 +597,10 @@ async function updatePreview(content) {
     corner.classList.add("visible");
   }, 400);
 
-  const html = await invoke("render_markdown", { text: content });
+  const [html, css] = await invoke("render_document", { text: content });
   if (gen !== _renderGen) return;
   previewEl.innerHTML = html;
+  applyDocumentCss(css);
 
   resolvePreviewImageSrcs();
 
@@ -640,6 +642,20 @@ async function updatePreview(content) {
 // front. Now each fenced block becomes a placeholder and only renders
 // when it scrolls into (or near) the viewport. A source-text cache
 // makes repeated formulas/diagrams nearly free.
+
+// The document's own <style> blocks, scoped to the preview (see doc-css.js).
+let lastDocCss = null;
+function applyDocumentCss(css) {
+  if (css === lastDocCss) return;
+  lastDocCss = css;
+  let style = document.getElementById("doc-css");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "doc-css";
+    document.head.appendChild(style);
+  }
+  style.textContent = scopeDocumentCss(css, "#preview");
+}
 
 const katexCache = new Map(); // source → rendered HTML
 const mermaidCache = new Map();

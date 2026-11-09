@@ -72,6 +72,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::render_markdown,
+            commands::render_document,
             commands::platform,
             commands::documents_dir,
             commands::load_settings,
