@@ -15,50 +15,38 @@ the same commit. A run is the existing suite plus that delta.
 
 ## Running
 
-Prereqs: a release build (`pnpm tauri build`) or `pnpm run tauri dev`, and the
-bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
+The scripts run with BAM, bad-ass-mcp's script runner. From this repo, on any
+platform, with a fresh release build (`pnpm tauri build`):
 
-1. `SMOKE` = a fresh empty temp directory. Run every `setup` entry with the
-   shell (`$SMOKE` expanded).
-2. Launch the app with the script's `launch` arguments (paths relative to
-   `$SMOKE`), e.g. `target/release/markthecrab "$SMOKE/a.md"`. Wait for its
-   window (`wait_for_window` "MarkTheCrab"), note its `window_id`, and
-   `start_recording` on that window.
-3. For each phase:
-   - `learn_layout(window_id, phase.learn)` → label → handle. A `null`
-     handle is a failure: the element isn't there.
-   - Build the `run_sequence` steps: replace `"target": "<label>"` with
-     `"handle": "<handle id>"`, `"$WINDOW"` with the window id, and drop
-     steps whose `only` doesn't include your platform. Strip `expect` before
-     sending, along with `save`. Run with `stop_on_error: true`. Any failed
-     step is a failure, and so is a `get_value` step whose result differs
-     from its `expect`. A `get_value` step with `"save": "x"` keeps its
-     result; a later `"expect": "$x"` compares against it.
-4. Run `checks`:
-   - `{"present": {name, role?}}` → `find_elements` must return ≥ 1.
-   - `{"absent": {name, role?}}` → `find_elements` must return 0.
-   - `{"windows": n}` → `list_windows` must show `n` MarkTheCrab windows.
-   - `{"shell": "..."}` → must exit 0.
-   - `{"manual": "..."}` → do what it says with the same tools; it's a
-     check the format can't express yet. Turn it into phases when you can.
-5. `stop_recording` to `$SMOKE/<script name>.mp4`, quit the app, report
-   PASS/FAIL per script with the failing step or check.
+```
+bad-ass-mcp run smoke/ --config bam.json
+```
 
-### Phase extras
+`bam.json` (not committed; the app path differs per machine):
 
-- A `learn` entry may carry `only`, like a step: skip it on other platforms
-  (a skipped entry isn't a null-handle failure).
-- `"window": "<title pattern>"` (or a per-platform object) runs the phase
-  against that window instead of `$WINDOW`: `wait_for_window` it, then
-  `learn_layout` with its id. Native dialogs and MarkTheCrab's own prompts
-  (e.g. "Unsaved changes", "External changes") are separate windows.
-- `"id": "x"` names a phase; `{"repeat": "x"}` runs that phase again with a
-  fresh `learn_layout` (handles from the first pass are stale).
-- A phase with only `checks` runs them at that point in the flow, same rules
-  as the top-level `checks`.
-- `{"no_window": "<pattern>"}` → `list_windows` must show no window whose
-  name matches.
-- `wait_for_window`'s `pattern` may be a per-platform object.
+```json
+{
+  "window": "MarkTheCrab",
+  "app": {
+    "macos": "/path/to/target/release/markthecrab",
+    "windows": "C:\\path\\to\\target\\release\\markthecrab.exe",
+    "linux": "/path/to/a/wrapper/that/execs/markthecrab"
+  },
+  "ready": { "name": "Insert emoji" },
+  "launch_timeout": 30
+}
+```
+
+- `app` makes the run launch its own copy and drive only that, so an open
+  MarkTheCrab with real notes is never touched.
+- `ready` waits for the toolbar: the window exists before its page does, and
+  keys sent earlier are lost.
+- Scripts for other platforms are skipped. Results, proof screenshots per
+  phase and `report.html` land in `bam-results/`; `--resume`, `--fail-fast`,
+  `--retries`, `--video` are described in bad-ass-mcp's `docs/bam.md`, which
+  is also the format reference (phases, checks, `only`, per-platform values,
+  `state`, `count`, `variables`, shell steps, `{"other": ...}` windows).
+- The run takes over keyboard and mouse for a minute or two.
 
 ## Conventions
 
@@ -112,12 +100,11 @@ bad-ass-mcp tools. Run each script that lists your platform in `platforms`:
 
 ## Linux notes (SteamOS / KDE Wayland, WebKitGTK 2.54, run 2026-11-09)
 
-- `smoke/runner.py` executes the steps above through bad-ass-mcp's own
-  functions in-process (see its header; it needs the bad-ass-mcp venv's
-  Python for `gi`). The app runs with `GDK_BACKEND=x11` so xdotool works.
-  It also records: ffmpeg x11grab (bad-ass-mcp's `start_recording`) is black
-  under Wayland, so the runner takes compositor screenshots between steps
-  and writes `<script>.mp4` (2 fps, cropped to the window).
+- Launch the app with `GDK_BACKEND=x11` (e.g. in the `app` wrapper) so
+  xdotool can drive it. Running bad-ass-mcp from source needs its Linux extra
+  for `gi` (`uv sync --extra linux`).
+- `--video` is black under Wayland (ffmpeg x11grab); leave it off there. Proof
+  screenshots per phase still work.
 - Roles: the menu bar's `File` is AT-SPI `menu`; tabs are `page tab` in a
   `page tab list` named "Open documents"; the active tab carries the
   `selected` state.
