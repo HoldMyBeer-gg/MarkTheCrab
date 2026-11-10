@@ -19,6 +19,19 @@ A cross-platform markdown editor built on [Tauri](https://v2.tauri.app/) + Rust 
 
 See [`SHOWCASE.md`](SHOWCASE.md) for every feature demonstrated side-by-side with its markdown source.
 
+## Download
+
+Installers for macOS, Windows and Linux are on the [Releases](https://github.com/HoldMyBeer-gg/MarkTheCrab/releases) page. The builds aren't code-signed yet, so each OS warns the first time:
+
+- **macOS** says *"MarkTheCrab is damaged and can't be opened"*. The app is fine; macOS blocks unsigned downloads this way. Drag it to Applications, then run this once in Terminal:
+
+  ```bash
+  xattr -cr /Applications/MarkTheCrab.app
+  ```
+
+- **Windows** shows *"Windows protected your PC"*. Click **More info**, then **Run anyway**.
+- **Linux**: make the AppImage executable (`chmod +x MarkTheCrab_*.AppImage`), or install the `.deb` / `.rpm`.
+
 ## Quickstart
 
 ```bash
