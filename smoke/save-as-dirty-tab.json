@@ -55,7 +55,7 @@
     },
     {
       "id": "open_save_as",
-      "note": "Windows: invoking the menu bar's File through UIA doesn't open it, so use real keys: F10 (File focused), Down (menu open on New Window), Down x5 to Save As (New Window, New Tab, Open..., Open Recent, Save, Save As...), Return. Linux: the menu bar's File is an AT-SPI 'menu'; give the popup a beat before activating its item or the activation is lost. GTK's Save dialog is not a separate window there (see save_dialog), so the wait is Windows-only.",
+      "note": "Windows: invoking the menu bar's File through UIA doesn't open it, so use real keys: F10 (File focused), Down (menu open on New Window), Down x7 to Save As (New Window, New Tab, Open..., Open Recent, Close Tab, Close Other Tabs, Save, Save As...), Return. Linux: the menu bar's File is an AT-SPI 'menu'; give the popup a beat before activating its item or the activation is lost. GTK's Save dialog is not a separate window there (see save_dialog), so the wait is Windows-only.",
       "learn": {
         "file_menu": { "name": "File", "role": "menu", "only": ["linux"] },
         "save_as": { "name": "Save As...", "only": ["linux"] }
@@ -69,6 +69,8 @@
         { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
         { "action": "key", "key": "Down", "only": ["windows"] },
         { "action": "sleep", "seconds": 0.3, "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
+        { "action": "key", "key": "Down", "only": ["windows"] },
         { "action": "key", "key": "Down", "only": ["windows"] },
         { "action": "key", "key": "Down", "only": ["windows"] },
         { "action": "key", "key": "Down", "only": ["windows"] },

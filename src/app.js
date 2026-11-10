@@ -241,6 +241,8 @@ async function dispatchMenu(id) {
     case "file.new": return newWindow();
     case "file.new_tab": return newFile();
     case "file.open": return openFile();
+    case "file.close_tab": if (activeTabId != null) return closeTab(activeTabId); return;
+    case "file.close_other_tabs": if (activeTabId != null) return closeOtherTabs(activeTabId); return;
     case "file.save": return saveFile();
     case "file.save_as": return saveFileAs();
     case "file.export_styled": return exportHtml(true);
@@ -1018,6 +1020,18 @@ async function closeTab(id) {
   }
   activeTabId = null; // force mountTab to perform the swap
   mountTab(tabs[Math.min(idx, tabs.length - 1)]);
+}
+
+async function closeOtherTabs(keepId) {
+  // Snapshot ids now; closeTab mutates `tabs` as it goes. A cancelled
+  // discard prompt leaves its tab in place — stop there so the user doesn't
+  // keep re-answering prompts for tabs they already said to keep.
+  const targets = tabs.filter((t) => t.id !== keepId).map((t) => t.id);
+  for (const id of targets) {
+    if (!tabs.some((t) => t.id === id)) continue;
+    await closeTab(id);
+    if (tabs.some((t) => t.id === id)) return;
+  }
 }
 
 // Reflect the active tab's modified flag into globals, status bar and the

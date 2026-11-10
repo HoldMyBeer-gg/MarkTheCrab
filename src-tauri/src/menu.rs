@@ -114,6 +114,11 @@ fn file_menu<R: Runtime>(app: &AppHandle<R>, recents: &[String]) -> tauri::Resul
         .accelerator("CmdOrCtrl+O")
         .build(app)?;
     let recent_sub = recent_submenu(app, recents)?;
+    let close_tab_item = MenuItemBuilder::with_id("file.close_tab", "Close Tab")
+        .accelerator("CmdOrCtrl+W")
+        .build(app)?;
+    let close_other_tabs_item =
+        MenuItemBuilder::with_id("file.close_other_tabs", "Close Other Tabs").build(app)?;
     let save_item = MenuItemBuilder::with_id("file.save", "Save")
         .accelerator("CmdOrCtrl+S")
         .build(app)?;
@@ -136,6 +141,9 @@ fn file_menu<R: Runtime>(app: &AppHandle<R>, recents: &[String]) -> tauri::Resul
         .item(&new_tab_item)
         .item(&open_item)
         .item(&recent_sub)
+        .separator()
+        .item(&close_tab_item)
+        .item(&close_other_tabs_item)
         .separator()
         .item(&save_item)
         .item(&save_as_item)
