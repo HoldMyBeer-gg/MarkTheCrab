@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="1231" height="832" alt="Screenshot 2026-04-22 235744" src="./showcase.png" />
+  <img width="1280" alt="MarkTheCrab showcase" src="./showcase.png" />
 </p>
 
 

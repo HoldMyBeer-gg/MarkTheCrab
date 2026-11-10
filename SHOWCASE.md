@@ -1,38 +1,40 @@
-# MarkTheCrab
+# MarkTheCrab 🦀
 
-*Every feature Remarkable users asked for. Built in Rust.*
+<style>
+:root { background: #fcfbf7; }
+.note {
+  border-left: 4px solid #0969da;
+  background: #ddf4ff;
+  padding: 0.4rem 0.9rem;
+  border-radius: 0 6px 6px 0;
+  margin: 0.7rem 0;
+}
+.note strong { color: #0550ae; }
+</style>
 
-$$\begin{aligned}
-\nabla \cdot \mathbf{E} &= \frac{\rho}{\varepsilon_0} \\
-\nabla \cdot \mathbf{B} &= 0 \\
-\nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \\
-\nabla \times \mathbf{B} &= \mu_0\mathbf{J} + \mu_0\varepsilon_0\frac{\partial \mathbf{E}}{\partial t}
-\end{aligned}$$
+*A markdown editor that keeps up with your typing. Built in Rust.* ✨
 
-<center>
-  <div style="text-align:center;margin:2rem 0">
-  <img src="src/assets/mascot/mascot.happy.svg" width="88" alt="Mark">
-  </div>
-</center>
+<div class="note">
 
-- [x] Live preview — rendered as you type, ~150 ms debounce
-- [x] Scroll sync — source-map based, not the crude top-to-bottom ratio
-- [x] KaTeX math — inline $E = mc^2$ and display blocks like above
-- [x] Mermaid diagrams — flowcharts, sequence, Gantt, and more
-- [x] Export to PDF — clean, chrome-free via system print dialog
-- [x] Recent files — last 10 files, one click away
-- [x] Custom CSS — scoped editor, saved with the document
-- [x] Syntax highlighting — 24 languages, loaded on demand
-- [x] Drag-and-drop images — auto-saved to `images/` beside your file
+**This preview is styled by the document itself** — the `<style>` block
+scopes to the preview pane, so your paper stays your paper.
+
+</div>
+
+$$
+\nabla \times \mathbf{B} \;=\; \mu_0\mathbf{J} + \mu_0\varepsilon_0\frac{\partial \mathbf{E}}{\partial t}
+$$
+
+- [x] Live preview — rendered as you type, with source-map scroll sync
+- [x] KaTeX math — inline $E = mc^2$ and display blocks
+- [x] Mermaid diagrams — flowcharts, sequence, Gantt, more
+- [x] Tabs — open as many docs as you like, dirty-state tracked
+- [x] Custom preview font, scoped `<style>`, in-app emoji picker
+- [x] PDF export — `Ctrl+P` → *Save as PDF*, theme-aware
 
 ```mermaid
 sequenceDiagram
-  participant You
-  participant Mark
-  participant Preview
   You->>Mark: types markdown
-  Mark->>Preview: renders in ~150ms
+  Mark->>Preview: renders live
   Preview-->>You: live result
-  Note over Mark: scroll sync keeps you oriented
 ```
-
