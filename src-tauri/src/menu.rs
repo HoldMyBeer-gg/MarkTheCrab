@@ -314,7 +314,14 @@ fn help_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Submenu<R>> {
 
 pub fn handle_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     if id == "file.new" {
-        new_window(app);
+        // Not inline: this runs inside the event loop's callback, and on
+        // Windows building a WebView2 window pumps messages while it waits.
+        // A key event arriving then re-enters the event loop, which this
+        // callback is still holding: self-deadlock (caught by a BAM run,
+        // about 1 in 25). Build it off the event loop, like the async
+        // new_window command does for Ctrl+N (c4d9c5e).
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { new_window(&app) });
         return;
     }
     if let Some(rest) = id.strip_prefix("file.recent.") {
