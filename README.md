@@ -21,16 +21,18 @@ See [`SHOWCASE.md`](SHOWCASE.md) for every feature demonstrated side-by-side wit
 
 ## Download
 
-Installers for macOS, Windows and Linux are on the [Releases](https://github.com/HoldMyBeer-gg/MarkTheCrab/releases) page. The builds aren't code-signed yet, so each OS warns the first time:
+Installers are on the [Releases](https://github.com/HoldMyBeer-gg/MarkTheCrab/releases) page. The builds aren't code-signed yet, so each OS warns the first time:
 
-- **macOS** says *"MarkTheCrab is damaged and can't be opened"*. The app is fine; macOS blocks unsigned downloads this way. Drag it to Applications, then run this once in Terminal:
+- **macOS** (Apple Silicon only for now; no Intel build yet). On macOS 15 and later it says *"MarkTheCrab is damaged and can't be opened"*. The app is fine; that's how macOS blocks unsigned downloads. Drag it to Applications, then run this once in Terminal:
 
   ```bash
-  xattr -cr /Applications/MarkTheCrab.app
+  xattr -dr com.apple.quarantine /Applications/MarkTheCrab.app
   ```
 
-- **Windows** shows *"Windows protected your PC"*. Click **More info**, then **Run anyway**.
-- **Linux**: make the AppImage executable (`chmod +x MarkTheCrab_*.AppImage`), or install the `.deb` / `.rpm`.
+  If you keep it somewhere else, type `xattr -dr com.apple.quarantine ` and drag the app onto the Terminal window to fill in its path. If macOS instead says *"cannot be opened because the developer cannot be verified"*, open **System Settings → Privacy & Security** and click **Open Anyway**.
+
+- **Windows**: use `MarkTheCrab_<version>_x64-setup.exe` (the `.msi` is for managed installs; stick to one of the two so upgrades don't leave two entries in Add/Remove Programs). It shows *"Windows protected your PC"*: click **More info**, then **Run anyway**.
+- **Linux**: install the `.deb` / `.rpm`, or run the AppImage with `chmod +x MarkTheCrab_*.AppImage`. AppImages need FUSE 2, which recent distros don't install by default: `sudo apt install libfuse2` (Ubuntu 22.04) or `sudo apt install libfuse2t64` (Ubuntu 24.04+).
 
 ## Quickstart
 

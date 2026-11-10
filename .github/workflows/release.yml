@@ -34,7 +34,7 @@ jobs:
                 repo,
                 tag_name: tag,
                 name: `MarkTheCrab ${tag}`,
-                body: 'See the commit history for changes in this release.',
+                body: "See the commit history for changes in this release.\n\n## First launch (builds aren't code-signed yet)\n- **macOS** (Apple Silicon only): macOS 15+ says the app *\"is damaged and can't be opened\"*. It isn't. Move it to Applications, then run once in Terminal: `xattr -dr com.apple.quarantine /Applications/MarkTheCrab.app`. If it says *\"the developer cannot be verified\"* instead: **System Settings \u2192 Privacy & Security \u2192 Open Anyway**.\n- **Windows:** use the `x64-setup.exe`. On *\"Windows protected your PC\"* click **More info \u2192 Run anyway**.\n- **Linux:** install the `.deb` / `.rpm`, or `chmod +x` the AppImage (needs `libfuse2`, or `libfuse2t64` on Ubuntu 24.04+).\n\nDetails: https://github.com/HoldMyBeer-gg/MarkTheCrab#download\n",
                 draft: true,
                 prerelease: false,
               });
