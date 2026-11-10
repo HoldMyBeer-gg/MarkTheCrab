@@ -97,6 +97,14 @@ bad-ass-mcp run smoke/ --config bam.json
   in `variables_note`.
 - `{"action": "shell", "cmd": "..."}` runs a shell command as a step, for
   `only`-gated platform glue (xdotool on Linux), never for the flow itself.
+- `{"action": "drag", "from_target": "a", "to_target": "b"}` drags between two
+  learned elements with real pointer events; `"dx"` / `"dy"` instead of
+  `to_target` drags the element by that many pixels (the editor/preview
+  splitter). `{"action": "get_bounds", "target": "a"}` reads `[x, y, w, h]`;
+  with `"save"` before a drag and `"expect_not": "$saved"` after it, the step
+  fails unless something moved. Needs bad-ass-mcp from 2026-11-09 or later.
+- A `state` may be `"pressed"`: a toolbar toggle with `aria-pressed="true"`
+  (verified on Linux; other platforms' toggle states unconfirmed).
 
 ## Linux notes (SteamOS / KDE Wayland, WebKitGTK 2.54, run 2026-11-09)
 
@@ -123,6 +131,9 @@ bad-ass-mcp run smoke/ --config bam.json
   Ctrl+L. GTK's replace prompt button is `Replace`.
 - Windows count: AT-SPI lists one application per process; each window is a
   `frame` under it, so `{"windows": n}` counts frames.
+- Drags work: xdotool's XTEST pointer (`mousedown`, interpolated `mousemove`,
+  `mouseup`) reaches the page's mouse handlers, so `resize-split.json` moves
+  the splitter in both layouts. `aria-pressed` is the AT-SPI `pressed` state.
 - bad-ass-mcp's Linux backend needed three fixes for these scripts to drive
   WebKitGTK at all; they live in that repo: XTEST keys instead of
   `xdotool key --window` (GTK drops the synthetic events), XTEST typing with
