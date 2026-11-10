@@ -5,10 +5,16 @@ const FLOW = "```mermaid\ngraph LR\n  A[Start] -->|yes| B[Go]\n  A -->|no| C[Sto
 
 // Relative luminance of the label text: light text on a dark preview, dark
 // text on a light one, so the edge labels stay readable.
+// While Mermaid redraws after a theme switch, the label can be caught
+// detached with no computed colour. Report that as null ("not drawn yet")
+// instead of throwing: expect.poll retries a failed match but not a throw,
+// which made the theme-switch test fail about 1 run in 6.
 const labelLuminance = (page) =>
   page.locator("#preview svg .edgeLabel").first().evaluate((el) => {
     const t = el.querySelector("p, span, text") || el;
-    const [r, g, b] = getComputedStyle(t).color.match(/\d+/g).map(Number);
+    const rgb = getComputedStyle(t).color.match(/\d+/g);
+    if (!el.isConnected || !rgb || rgb.length < 3) return null;
+    const [r, g, b] = rgb.map(Number);
     return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   });
 
