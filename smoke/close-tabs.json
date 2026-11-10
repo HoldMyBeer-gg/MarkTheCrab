@@ -2,7 +2,7 @@
   "name": "close-tabs",
   "covers": "File > Close Tab and File > Close Other Tabs (dc2e10a). Close Other Tabs loops through closeTab, so a Cancel on the first unsaved-changes prompt stops the loop instead of keeping prompting; the surviving tabs are the keep-tab plus every tab a cancel left behind.",
   "platforms": ["linux", "windows"],
-  "verified": { "linux": "2026-11-09" },
+  "verified": { "linux": "2026-11-09", "windows": "2026-11-09" },
   "setup": [
     { "shell": "printf 'kept\\n' > \"$SMOKE/keep.md\"" }
   ],
