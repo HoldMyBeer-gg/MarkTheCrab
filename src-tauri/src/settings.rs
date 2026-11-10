@@ -2,7 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+// `default` on the struct: a settings file missing fields (written by an
+// older version, or hand-edited) keeps every value it has and fills the rest
+// from Settings::default(). Without it, one missing key failed the whole
+// parse and load() silently reset the user's settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     pub theme: String,
     pub custom_css: String,
@@ -65,11 +70,24 @@ impl Default for Settings {
     }
 }
 
+/// Where settings live: `MARKTHECRAB_CONFIG_DIR` if set (isolated test runs
+/// on any OS, so automation never touches the user's real settings),
+/// otherwise `<platform config dir>/markthecrab`.
+fn config_dir_from(override_dir: Option<String>, platform_dir: Option<PathBuf>) -> PathBuf {
+    match override_dir {
+        Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+        _ => platform_dir
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("markthecrab"),
+    }
+}
+
 impl Settings {
     fn config_path() -> PathBuf {
-        let config_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("markthecrab");
+        let config_dir = config_dir_from(
+            std::env::var("MARKTHECRAB_CONFIG_DIR").ok(),
+            dirs::config_dir(),
+        );
         fs::create_dir_all(&config_dir).ok();
         config_dir.join("settings.toml")
     }
@@ -114,5 +132,34 @@ mod tests {
             .join("\n");
         let s: Settings = toml::from_str(&old).unwrap();
         assert_eq!(s.preview_font, "");
+    }
+
+    #[test]
+    fn a_settings_file_missing_fields_keeps_the_values_it_has() {
+        // Before: any missing key failed the parse and load() silently fell
+        // back to defaults, wiping the user's settings on upgrade.
+        let partial = "theme = \"dark\"\nrecent_files = [\"/notes/a.md\"]\n";
+        let s: Settings = toml::from_str(partial).expect("partial file must parse");
+        assert_eq!(s.theme, "dark");
+        assert_eq!(s.recent_files, vec!["/notes/a.md".to_string()]);
+        assert_eq!(s.font_size, Settings::default().font_size);
+        assert!(s.line_numbers);
+    }
+
+    #[test]
+    fn config_dir_can_be_overridden_for_isolated_runs() {
+        let base = Some(PathBuf::from("/home/u/.config"));
+        assert_eq!(
+            config_dir_from(None, base.clone()),
+            PathBuf::from("/home/u/.config/markthecrab")
+        );
+        assert_eq!(
+            config_dir_from(Some("/tmp/bam-run".into()), base.clone()),
+            PathBuf::from("/tmp/bam-run")
+        );
+        assert_eq!(
+            config_dir_from(Some(String::new()), base),
+            PathBuf::from("/home/u/.config/markthecrab")
+        );
     }
 }
