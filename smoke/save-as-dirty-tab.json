@@ -192,13 +192,9 @@
   ],
   "checks": [
     { "windows": 1 },
-    { "present": { "role": { "linux": "page tab" }, "count": 2 }, "only": ["linux"], "note": "Exactly two tabs: no third one was added by re-opening." },
-    { "present": { "name": "style.md", "role": { "linux": "page tab" }, "state": "selected", "count": 1 }, "only": ["linux"] },
-    { "present": { "name": "Untitled", "role": { "linux": "page tab" }, "count": 1 }, "only": ["linux"] },
-    {
-      "manual": "Exactly two tabs (find_elements role 'tabitem' on Windows): one whose name starts with 'style.md' and is 'selected', and 'Untitled' unselected. No third tab.",
-      "only": ["windows"]
-    }
+    { "present": { "role": { "linux": "page tab", "windows": "tabitem" }, "count": 2 }, "note": "Exactly two tabs: no third one was added by re-opening." },
+    { "present": { "name": "style.md", "role": { "linux": "page tab", "windows": "tabitem" }, "state": "selected", "count": 1 } },
+    { "present": { "name": "Untitled", "role": { "linux": "page tab", "windows": "tabitem" }, "count": 1 } }
   ],
   "notes": "Windows run 2026-11-09 confirmed every native-dialog name above. Linux run 2026-11-09 (SteamOS, WebKitGTK 2.54) confirmed the Linux ones; the key difference is that GTK's file dialogs and MarkTheCrab's own prompts are not separate windows on Linux, so `window` and `wait_for_window` patterns are null there and the phase runs against $WINDOW. The MarkTheCrab prompt's buttons come from ask() (okLabel 'Replace', cancelLabel 'Cancel'), so those names are ours and stable."
 }

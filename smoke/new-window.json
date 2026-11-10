@@ -41,11 +41,34 @@
         { "action": "click", "target": "new_window", "only": ["linux"] },
         { "action": "sleep", "seconds": 3, "only": ["linux"] }
       ]
+    },
+    {
+      "only": ["windows"],
+      "checks": [{ "windows": 2 }]
+    },
+    {
+      "only": ["windows"],
+      "window": { "other": "MarkTheCrab" },
+      "note": "Windows: the new window is listed separately. Learning 'Insert emoji' in it proves it loaded (not blank white, the c4d9c5e deadlock); one click on its close button must close it.",
+      "learn": {
+        "emoji": { "name": "Insert emoji" },
+        "close": { "name": "Close", "role": { "windows": "button" } }
+      },
+      "steps": [
+        { "action": "click", "target": "close" },
+        { "action": "sleep", "seconds": 3 }
+      ]
     }
   ],
   "checks": [
     {
-      "windows": 2
+      "windows": 2,
+      "only": ["linux"]
+    },
+    {
+      "windows": 1,
+      "only": ["windows"],
+      "note": "The new window closed on the first click; the original is still open."
     },
     {
       "present": { "name": "Insert emoji", "count": 2 },
@@ -56,10 +79,6 @@
       "shell": "new=$(xdotool getactivewindow); xdotool getwindowclassname \"$new\" | grep -qi markthecrab || exit 2; xdotool windowclose \"$new\"; for i in 1 2 3 4 5 6; do sleep 0.5; n=0; for w in $(xdotool search --onlyvisible --class markthecrab); do xprop -id \"$w\" _NET_WM_WINDOW_TYPE | grep -q NORMAL && n=$((n+1)); done; [ \"$n\" -eq 1 ] && exit 0; done; exit 1",
       "only": ["linux"],
       "note": "The new window is the active one. Close it with the window manager (its close button isn't in the a11y tree) and expect one normal MarkTheCrab window within 3 s (popups and tooltips share the class, so count only NORMAL-type windows)."
-    },
-    {
-      "only": ["windows"],
-      "manual": "In the NEW window (list_windows, the one that isn't $WINDOW): learn_layout {'emoji': {'name': 'Insert emoji'}, 'close': {'name': 'Close', 'role': {'windows': 'button'}}} and both resolve (it loaded, not blank white). Click 'close' once (on Linux the window manager's close button, or xdotool windowclose if it isn't in the tree) and check list_windows shows 1 MarkTheCrab window within 3 s. Windows: verified with exactly these names."
     }
   ],
   "notes": "The toolbar also has a group named 'File' (the New/Open/Save buttons), so the Linux menu lookup needs its role. Linux names/roles confirmed on the 2026-11-09 run; `windows` counts AT-SPI frames there."
