@@ -118,26 +118,24 @@ dropdown), and any toolbar toggle a script clicks is persisted at once:
 one must flip it back, and a script that fails in between leaves it flipped
 (resize-split between its two Toggle layout clicks leaves the app stacked).
 
-Isolate it where you can. On Linux the `dirs` crate honours
-`XDG_CONFIG_HOME`, so point the BAM launch wrapper at a scratch dir that it
-wipes per launch (fresh defaults every run, nothing of the user's touched).
-Under distrobox the variable must go on the inner command, since
-`distrobox-enter` resets it:
+Isolate it. Since d230446 `MARKTHECRAB_CONFIG_DIR` overrides the settings
+dir on every OS (empty = ignored): point the BAM launch wrapper at a scratch
+dir it wipes per launch, so every run starts from defaults and nothing of
+the user's is touched. Under distrobox the variable goes on the inner
+command, since `distrobox-enter` rewrites the environment:
 
 ```sh
-exec distrobox-enter -n build -- env XDG_CONFIG_HOME="$CFG" GDK_BACKEND=x11 \
+exec distrobox-enter -n build -- env MARKTHECRAB_CONFIG_DIR="$CFG" GDK_BACKEND=x11 \
   target/release/markthecrab "$@"
 ```
 
-Windows and macOS have no such override (the app would need a config-dir
-env var of its own), so there the runner should start from, and restore, a
-copy of the user's file.
+(On Linux `XDG_CONFIG_HOME` works too, for builds before d230446.)
 
 Seed the isolated file with a complete `settings.toml` (copy one the app
 wrote, or `Settings::default()` serialised) that has one `recent_files`
-entry, any path. It must be complete: a file missing any key other than
-`preview_font` fails to parse and the app silently replaces it with all
-defaults, so a one-line seed is no seed. With no recent files,
+entry, any path. Before d230446 it had to be complete (a file missing any
+key other than `preview_font` was silently replaced by all defaults); since
+then missing keys take their defaults. With no recent files,
 a launch without a file argument (font-picker-escape, new-window) opens the
 first-run welcome card, a modal `<dialog>` that makes the page inert, and
 WebKitGTK drops inert content from the a11y tree: the toolbar vanishes and
