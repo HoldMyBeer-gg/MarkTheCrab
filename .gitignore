@@ -40,3 +40,6 @@ temp/
 # Playwright
 test-results/
 playwright-report/
+
+# Private build notes (paid Steam build); shared between checkouts by hand
+docs/private/
