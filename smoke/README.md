@@ -101,8 +101,8 @@ bad-ass-mcp run smoke/ --config bam.json
 ## Linux notes (SteamOS / KDE Wayland, WebKitGTK 2.54, run 2026-11-09)
 
 - Launch the app with `GDK_BACKEND=x11` (e.g. in the `app` wrapper) so
-  xdotool can drive it. Running bad-ass-mcp from source needs its Linux extra
-  for `gi` (`uv sync --extra linux`).
+  xdotool can drive it. bad-ass-mcp on Linux has no extra: run it from a venv
+  created with `--system-site-packages`, so it sees the system's `gi`.
 - `--video` is black under Wayland (ffmpeg x11grab); leave it off there. Proof
   screenshots per phase still work.
 - Roles: the menu bar's `File` is AT-SPI `menu`; tabs are `page tab` in a
