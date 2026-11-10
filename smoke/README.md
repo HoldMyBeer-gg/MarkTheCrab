@@ -106,6 +106,47 @@ bad-ass-mcp run smoke/ --config bam.json
 - A `state` may be `"pressed"`: a toolbar toggle with `aria-pressed="true"`
   (verified on Linux; other platforms' toggle states unconfirmed).
 
+## The app under test uses the real settings file
+
+MarkTheCrab reads and writes the user's own `settings.toml`
+(`dirs::config_dir()/markthecrab/`: `~/.config` on Linux, `%APPDATA%` on
+Windows, `~/Library/Application Support` on macOS). A smoke run therefore
+changes it: every launched file lands in `recent_files` (and in the Recent
+dropdown), and any toolbar toggle a script clicks is persisted at once:
+`live_preview` (Toggle preview), `vertical_layout` (Toggle layout),
+`night_mode`, `theme`, fonts, `zoom_level`, window size. A script that flips
+one must flip it back, and a script that fails in between leaves it flipped
+(resize-split between its two Toggle layout clicks leaves the app stacked).
+
+Isolate it where you can. On Linux the `dirs` crate honours
+`XDG_CONFIG_HOME`, so point the BAM launch wrapper at a scratch dir that it
+wipes per launch (fresh defaults every run, nothing of the user's touched).
+Under distrobox the variable must go on the inner command, since
+`distrobox-enter` resets it:
+
+```sh
+exec distrobox-enter -n build -- env XDG_CONFIG_HOME="$CFG" GDK_BACKEND=x11 \
+  target/release/markthecrab "$@"
+```
+
+Windows and macOS have no such override (the app would need a config-dir
+env var of its own), so there the runner should start from, and restore, a
+copy of the user's file.
+
+Seed the isolated file with a complete `settings.toml` (copy one the app
+wrote, or `Settings::default()` serialised) that has one `recent_files`
+entry, any path. It must be complete: a file missing any key other than
+`preview_font` fails to parse and the app silently replaces it with all
+defaults, so a one-line seed is no seed. With no recent files,
+a launch without a file argument (font-picker-escape, new-window) opens the
+first-run welcome card, a modal `<dialog>` that makes the page inert, and
+WebKitGTK drops inert content from the a11y tree: the toolbar vanishes and
+the app never becomes "ready" (seen 2026-11-09, two scripts failed that way).
+
+Under distrobox, terminating the `distrobox-enter` client does not stop the
+app inside the container, so each run leaves a MarkTheCrab behind unless the
+wrapper traps TERM and kills it (`pkill -x -n markthecrab`, newest only).
+
 ## Linux notes (SteamOS / KDE Wayland, WebKitGTK 2.54, run 2026-11-09)
 
 - Launch the app with `GDK_BACKEND=x11` (e.g. in the `app` wrapper) so
