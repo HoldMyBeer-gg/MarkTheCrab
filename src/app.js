@@ -9,6 +9,7 @@ import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isB
 import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
 import { scopeDocumentCss } from "./doc-css.js";
+import { mermaidThemeFor } from "./mermaid-theme.js";
 import { searchEmoji } from "./emoji.js";
 import { EMOJI_GROUPS } from "./emoji-data.js";
 import { parseFontSetting, fontSettingValue, fontStack, selectValue, filterFamilies, previewFontCss } from "./fonts.js";
@@ -765,6 +766,7 @@ function sanitizeSvg(svgString) {
 
 // Mermaid diagrams from ```mermaid fenced blocks. Same lazy strategy.
 let mermaidPromise = null;
+let mermaidTheme = null; // theme mermaid was last initialized with
 let mermaidBlockCounter = 0;
 async function renderMermaidInPreview() {
   const blocks = previewEl.querySelectorAll(
@@ -785,20 +787,20 @@ async function renderMermaidInPreview() {
     container.__mtcLazyRender = async () => {
       container.classList.remove("mermaid-pending");
       container.style.minHeight = "";
-      const cached = mermaidCache.get(source);
+      // Match the preview behind the diagram, not the app's night mode:
+      // a dark preview theme on a light app is common.
+      const theme = mermaidThemeFor([
+        getComputedStyle(previewEl).backgroundColor,
+        getComputedStyle(previewPane).backgroundColor,
+      ]);
+      const cacheKey = `${theme}\n${source}`;
+      const cached = mermaidCache.get(cacheKey);
       if (cached != null) {
         container.innerHTML = cached;
         return;
       }
       if (!mermaidPromise) {
-        mermaidPromise = import("mermaid").then(({ default: m }) => {
-          m.initialize({
-            startOnLoad: false,
-            securityLevel: "strict",
-            theme: settings.night_mode ? "dark" : "default",
-          });
-          return m;
-        });
+        mermaidPromise = import("mermaid").then(({ default: m }) => m);
       }
       try {
         if (!mermaid) mermaid = await mermaidPromise;
@@ -806,13 +808,17 @@ async function renderMermaidInPreview() {
         console.warn("Mermaid failed to load:", err);
         return;
       }
+      if (mermaidTheme !== theme) {
+        mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme });
+        mermaidTheme = theme;
+      }
       const id = `mtc-mermaid-${++mermaidBlockCounter}`;
       try {
         const { svg } = await mermaid.render(id, source);
         document.getElementById(`d${id}`)?.remove();
         const safeSvg = sanitizeSvg(svg);
         container.innerHTML = safeSvg;
-        cachePut(mermaidCache, source, safeSvg);
+        cachePut(mermaidCache, cacheKey, safeSvg);
       } catch (err) {
         document.getElementById(`d${id}`)?.remove();
         renderMascotErrorCard(container, "Mermaid parse error", err);
@@ -1795,10 +1801,12 @@ function setupSettingsDialog() {
   if (!dialog) return;
 
   const themeSel = document.getElementById("settings-theme-select");
-  themeSel.addEventListener("change", (e) => {
+  themeSel.addEventListener("change", async (e) => {
     settings.theme = e.target.value;
-    applyTheme(settings.theme);
     invoke("update_setting", { key: "theme", value: settings.theme });
+    // Wait for the theme's CSS before re-rendering: diagrams read the
+    // preview's background colour to pick their own palette.
+    await applyTheme(settings.theme);
     updatePreview(getContent(editor));
   });
 
