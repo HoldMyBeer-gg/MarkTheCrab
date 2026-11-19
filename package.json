@@ -38,7 +38,7 @@
     "esbuild": "^0.28.1",
     "highlight.js": "^11.11.1",
     "katex": "^0.18.2",
-    "mermaid": "^11.16.1",
+    "mermaid": "^12.3.0",
     "nspell": "^2.1.5"
   }
 }
