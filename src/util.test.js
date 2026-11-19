@@ -6,6 +6,7 @@ import {
   encodeMarkdownUrl,
   rebaseDocumentsPath,
   bytesToBase64,
+  quoteMarkdownTitle,
 } from "./util.js";
 
 // The contract that matters most: iOS work must not leak into desktop. Every
@@ -105,5 +106,22 @@ describe("bytesToBase64", () => {
     expect(decoded.length).toBe(big.length);
     expect(decoded[0]).toBe("A");
     expect(decoded[decoded.length - 1]).toBe("A");
+  });
+});
+
+// CodeQL js/incomplete-sanitization: escaping only the quote let a title
+// ending in a backslash escape its own closing quote and break the image.
+describe("quoteMarkdownTitle", () => {
+  it("wraps a plain title in double quotes", () => {
+    expect(quoteMarkdownTitle("Crab")).toBe('"Crab"');
+  });
+
+  it("escapes double quotes", () => {
+    expect(quoteMarkdownTitle('say "hi"')).toBe('"say \\"hi\\""');
+  });
+
+  it("escapes backslashes before quotes so a trailing backslash cannot eat the closing quote", () => {
+    expect(quoteMarkdownTitle("C:\\")).toBe('"C:\\\\"');
+    expect(quoteMarkdownTitle('a\\"b')).toBe('"a\\\\\\"b"');
   });
 });

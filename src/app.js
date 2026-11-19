@@ -6,7 +6,7 @@ import { Mascot } from "./mascot.js";
 window.hljs = hljs;
 
 import { invoke, convertFileSrc, dialog, event as tauriEvent, currentWindow, isBrowser } from "./runtime.js";
-import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64 } from "./util.js";
+import { isMobilePlatform, parentDir, joinPath, encodeMarkdownUrl, rebaseDocumentsPath, bytesToBase64, quoteMarkdownTitle } from "./util.js";
 import { scopeThemeCss } from "./theme-scope.js";
 import { scopeDocumentCss } from "./doc-css.js";
 import { mermaidThemeFor } from "./mermaid-theme.js";
@@ -1747,7 +1747,7 @@ function setupDialogs() {
     const title = document.getElementById("image-title").value;
     const encoded = encodeMarkdownUrl(url);
     const md = title
-      ? `![${alt}](${encoded} "${title.replace(/"/g, '\\"')}")`
+      ? `![${alt}](${encoded} ${quoteMarkdownTitle(title)})`
       : `![${alt}](${encoded})`;
     insertAtCursor(editor, md);
     document.getElementById("image-dialog").close();
