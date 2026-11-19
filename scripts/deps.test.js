@@ -21,4 +21,15 @@ describe("locked dependencies", () => {
       expect(vulnerable, `vite ${major}.${minor}.${patch}`).toBe(false);
     }
   });
+
+  // katex below 0.18.2 lets existing prototype pollution bypass its trust
+  // restrictions. mermaid 11 pulls 0.16.x in alongside our own katex.
+  it("resolves no katex older than 0.18.2", () => {
+    const katexes = versionsOf("katex");
+    expect(katexes.length).toBeGreaterThan(0);
+    for (const [major, minor, patch] of katexes) {
+      const vulnerable = major === 0 && (minor < 18 || (minor === 18 && patch < 2));
+      expect(vulnerable, `katex ${major}.${minor}.${patch}`).toBe(false);
+    }
+  });
 });
