@@ -39,6 +39,12 @@ export function encodeMarkdownUrl(url) {
   return url;
 }
 
+// A markdown link or image title in double quotes. Backslashes are escaped
+// first so a trailing one can't escape the closing quote.
+export function quoteMarkdownTitle(title) {
+  return `"${String(title).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 // Re-base a stored absolute path onto the live Documents directory. iOS
 // rotates the sandbox container UUID on reinstall, so the prefix before
 // "/Documents/" goes stale while the tail stays stable. Returns the original
